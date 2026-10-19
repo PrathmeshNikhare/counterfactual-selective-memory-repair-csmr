@@ -1,0 +1,12 @@
+.env
+.cache/
+__pycache__/
+*.pyc
+.pytest_cache/
+out/
+results/*.csv
+results/*.png
+models/*.json
+.venv/
+venv/
+.claude/settings.local.json

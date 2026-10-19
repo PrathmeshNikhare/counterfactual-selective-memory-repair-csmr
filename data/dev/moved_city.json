@@ -1,0 +1,22 @@
+{
+  "id": "dev_moved_city",
+  "category": "direct_contradiction",
+  "domain": "residence",
+  "memories": [
+    {"id": "M1", "text": "The user lives in Delhi.", "entity": "user", "attribute": "residence", "time": "2025-11-01T10:00:00", "source": "user"},
+    {"id": "M2", "text": "The user's local gym is in Saket, Delhi.", "entity": "user", "attribute": "gym", "time": "2025-12-01T10:00:00", "source": "user"},
+    {"id": "M3", "text": "The user likes winter weather.", "entity": "user", "attribute": "weather_preference", "time": "2025-12-20T10:00:00", "source": "user"},
+    {"id": "M4", "text": "The user is learning the guitar.", "entity": "user", "attribute": "hobby", "time": "2026-01-05T10:00:00", "source": "user"},
+    {"id": "M5", "text": "The user is vegetarian.", "entity": "user", "attribute": "diet", "time": "2025-10-10T10:00:00", "source": "user"}
+  ],
+  "observation": {"text": "I've moved to Pune permanently, settled in Baner now.", "source": "user", "time": "2026-05-15T10:00:00"},
+  "gold": {
+    "actions": {"M1": "REVISE", "M2": "REVOKE", "M3": "KEEP", "M4": "KEEP", "M5": "KEEP"},
+    "dependencies": [["M1", "M2"]],
+    "eval_questions": [
+      {"q": "Which city does the user live in?", "gold_answer": "Pune (Baner).", "depends_on": ["M1"]},
+      {"q": "Where is the user's gym?", "gold_answer": "Unknown; the Saket, Delhi gym no longer applies since they moved to Pune.", "depends_on": ["M2"]},
+      {"q": "Is the user vegetarian?", "gold_answer": "Yes.", "depends_on": ["M5"]}
+    ]
+  }
+}

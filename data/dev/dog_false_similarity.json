@@ -1,0 +1,24 @@
+{
+  "id": "dev_dog_false_similarity",
+  "category": "false_similarity",
+  "domain": "pet",
+  "note": "Many memories mention dogs/pets but only M1 is affected. Tests over-repair.",
+  "memories": [
+    {"id": "M1", "text": "The user has a cat named Mochi and no other pets.", "entity": "user", "attribute": "pets", "time": "2025-09-01T10:00:00", "source": "user"},
+    {"id": "M2", "text": "The user enjoys watching dog training videos.", "entity": "user", "attribute": "media_interest", "time": "2025-10-01T10:00:00", "source": "user"},
+    {"id": "M3", "text": "The user volunteers at an animal shelter once a month.", "entity": "user", "attribute": "volunteering", "time": "2025-11-01T10:00:00", "source": "user"},
+    {"id": "M4", "text": "The user's favourite animal is the golden retriever.", "entity": "user", "attribute": "favourite_animal", "time": "2025-11-15T10:00:00", "source": "user"},
+    {"id": "M5", "text": "The user buys cat food from an online store.", "entity": "user", "attribute": "shopping", "time": "2026-01-10T10:00:00", "source": "user"},
+    {"id": "M6", "text": "The user works night shifts.", "entity": "user", "attribute": "work_schedule", "time": "2026-02-01T10:00:00", "source": "user"}
+  ],
+  "observation": {"text": "We adopted a beagle puppy yesterday, so now Mochi has company!", "source": "user", "time": "2026-06-20T18:00:00"},
+  "gold": {
+    "actions": {"M1": "REVISE", "M2": "KEEP", "M3": "KEEP", "M4": "KEEP", "M5": "KEEP", "M6": "KEEP"},
+    "dependencies": [],
+    "eval_questions": [
+      {"q": "What pets does the user have?", "gold_answer": "A cat named Mochi and a beagle puppy.", "depends_on": ["M1"]},
+      {"q": "Does the user still buy cat food?", "gold_answer": "Yes.", "depends_on": ["M5"]},
+      {"q": "What is the user's favourite animal?", "gold_answer": "The golden retriever.", "depends_on": ["M4"]}
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "dev_car_sale",
+  "category": "one_hop",
+  "domain": "vehicle",
+  "note": "Paper Section VI worked example. Must reproduce Table II.",
+  "memories": [
+    {"id": "M1", "text": "The user owns a car.", "entity": "user", "attribute": "vehicle_ownership", "time": "2026-03-01T10:00:00", "source": "user"},
+    {"id": "M2", "text": "The user drives to work by car.", "entity": "user", "attribute": "commute_mode", "time": "2026-03-05T09:00:00", "source": "user"},
+    {"id": "M3", "text": "The user spends money on fuel.", "entity": "user", "attribute": "expenses", "time": "2026-04-02T18:00:00", "source": "user"},
+    {"id": "M4", "text": "The user prefers driving.", "entity": "user", "attribute": "travel_preference", "time": "2026-04-10T12:00:00", "source": "user"},
+    {"id": "M5", "text": "The user likes Italian food.", "entity": "user", "attribute": "food_preference", "time": "2026-02-14T20:00:00", "source": "user"}
+  ],
+  "observation": {"text": "I sold my car.", "source": "user", "time": "2026-06-01T11:00:00"},
+  "gold": {
+    "actions": {"M1": "REVOKE", "M2": "REVISE", "M3": "VERIFY", "M4": "KEEP", "M5": "KEEP"},
+    "dependencies": [["M1", "M2"], ["M1", "M3"]],
+    "eval_questions": [
+      {"q": "Does the user currently own a car?", "gold_answer": "No, the user sold their car.", "depends_on": ["M1"]},
+      {"q": "How does the user commute to work?", "gold_answer": "Unknown; not by their own car since they sold it.", "depends_on": ["M2"]},
+      {"q": "Does the user prefer driving?", "gold_answer": "Yes.", "depends_on": ["M4"]},
+      {"q": "What food does the user like?", "gold_answer": "Italian food.", "depends_on": ["M5"]}
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "id": "dev_phone_repair",
+  "category": "temporary_change",
+  "domain": "devices",
+  "note": "Temporary state: dependents should become CONDITIONAL, not revoked.",
+  "memories": [
+    {"id": "M1", "text": "The user uses an iPhone 15 as their only phone.", "entity": "user", "attribute": "phone", "time": "2025-12-01T10:00:00", "source": "user"},
+    {"id": "M2", "text": "The user pays for things using Apple Pay on their phone.", "entity": "user", "attribute": "payment_method", "time": "2026-01-05T10:00:00", "source": "user"},
+    {"id": "M3", "text": "The user prefers iOS over Android.", "entity": "user", "attribute": "os_preference", "time": "2026-01-10T10:00:00", "source": "user"},
+    {"id": "M4", "text": "The user reads news every morning.", "entity": "user", "attribute": "routine", "time": "2026-02-01T10:00:00", "source": "user"}
+  ],
+  "observation": {"text": "My iPhone is at the service centre for a week, so I'm using my dad's old Android for now.", "source": "user", "time": "2026-06-12T10:00:00"},
+  "gold": {
+    "actions": {"M1": "CONDITIONAL", "M2": "CONDITIONAL", "M3": "KEEP", "M4": "KEEP"},
+    "dependencies": [["M1", "M2"]],
+    "eval_questions": [
+      {"q": "What phone is the user using this week?", "gold_answer": "Their dad's old Android, temporarily, while the iPhone is being repaired.", "depends_on": ["M1"]},
+      {"q": "Which mobile OS does the user prefer?", "gold_answer": "iOS.", "depends_on": ["M3"]}
+    ]
+  }
+}

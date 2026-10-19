@@ -1,0 +1,83 @@
+# All tunables for CSMR. No magic numbers in code (CLAUDE.md rule 6).
+
+seed: 42
+
+llm:
+  model: "llama-3.1-8b-instant"        # any OpenAI-compatible model name; base_url/key come from .env
+  judge_model: null                     # null = same as model
+  temperature: 0
+  max_retries: 4
+  cache_dir: ".cache/llm"
+
+models:
+  embedder: "sentence-transformers/all-MiniLM-L6-v2"
+  nli: "cross-encoder/nli-deberta-v3-small"
+
+# Phase A
+root_nli_threshold: 0.8
+
+# Phase B
+top_k: 10
+max_hops: 2
+hop_sim: 0.35
+
+# Phase C thresholds
+tau_d: 0.5          # dependency threshold
+tau_e: 0.6          # evidence sufficiency threshold (paper τe)
+revoke_contradiction: 0.5
+
+# Hand-set starting weights (logistic regression). Replaced by models/*.json after fit().
+# Tuning these on data/dev is allowed until the dataset exists.
+dependency_weights:
+  intercept: -3.0
+  cos_sim: 1.0
+  same_entity: 0.2
+  same_attribute: 1.5
+  nli_entail: 1.0
+  nli_contra_new: 2.0
+  temporal_after: 0.2
+  same_source: 0.1
+  causal_cue: 3.0
+  hop_closeness: 1.0
+
+evidence_weights:
+  intercept: -7.0
+  source_reliability: 1.5
+  directness: 1.5
+  contradiction_strength: 3.0
+  not_hedged: 2.0
+  not_temporary: 1.5
+  corroboration: 0.5
+  extraction_conf: 1.0
+  freshness: 0.5
+
+source_reliability:
+  user: 0.9
+  tool: 0.8
+  third_party: 0.5
+  inferred: 0.3
+
+hedge_patterns: ["\\bmight\\b", "\\bmaybe\\b", "thinking of", "planning to", "not sure", "\\bprobably\\b", "considering"]
+temporary_patterns: ["this week", "for now", "temporarily", "\\buntil\\b", "for a few days", "for a week", "at the moment"]
+
+# Phase D objective (paper Section V)
+n_probes: 4
+lambda_c: 0.5       # collateral
+lambda_e: 0.1       # evidence cost
+lambda_s: 0.05      # repair size
+verify_cost: 0.1
+call_cost: 0.0
+r4_min_pdep: 0.2
+
+# Downstream agent
+agent_top_k: 5
+
+# Ablations (paper VIII): each flag swaps a stage for its trivial default
+ablation:
+  use_dependency: true
+  use_evidence: true
+  use_counterfactual: true
+  use_minimality: true
+
+# Baselines
+sim_prop_threshold: 0.4

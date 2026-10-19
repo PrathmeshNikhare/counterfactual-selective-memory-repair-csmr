@@ -1,0 +1,21 @@
+{
+  "id": "dev_bike_maybe",
+  "category": "weak_evidence",
+  "domain": "vehicle",
+  "note": "Hedged observation: nothing should be REVISED/REVOKED; dependents at most VERIFY.",
+  "memories": [
+    {"id": "M1", "text": "The user owns a Royal Enfield motorbike.", "entity": "user", "attribute": "vehicle_ownership", "time": "2025-08-01T10:00:00", "source": "user"},
+    {"id": "M2", "text": "The user rides the motorbike to college.", "entity": "user", "attribute": "commute_mode", "time": "2025-08-10T10:00:00", "source": "user"},
+    {"id": "M3", "text": "The user goes on weekend bike trips to Lonavala.", "entity": "user", "attribute": "hobby", "time": "2025-09-01T10:00:00", "source": "user"},
+    {"id": "M4", "text": "The user is preparing for GATE.", "entity": "user", "attribute": "education_goal", "time": "2026-01-01T10:00:00", "source": "user"}
+  ],
+  "observation": {"text": "I might sell my bike next year, not sure yet.", "source": "user", "time": "2026-06-05T10:00:00"},
+  "gold": {
+    "actions": {"M1": "VERIFY", "M2": "KEEP", "M3": "KEEP", "M4": "KEEP"},
+    "dependencies": [["M1", "M2"], ["M1", "M3"]],
+    "eval_questions": [
+      {"q": "Does the user own a motorbike?", "gold_answer": "Yes (they may sell it next year).", "depends_on": ["M1"]},
+      {"q": "How does the user get to college?", "gold_answer": "By motorbike.", "depends_on": ["M2"]}
+    ]
+  }
+}
