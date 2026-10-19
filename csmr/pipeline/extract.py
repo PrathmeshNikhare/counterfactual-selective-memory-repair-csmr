@@ -25,7 +25,7 @@ Otherwise return:
 def extract_state_change(obs: Observation, known_attributes: list[str]) -> StateChange | None:
     """Paper IV-A: Δ = (entity, attribute, old, new, time, source, confidence). One LLM call."""
     prompt = EXTRACT_PROMPT.format(text=obs.text, known=sorted(set(known_attributes)) or "none")
-    sc = llm.call(prompt, json_mode=True).get("state_change")
+    sc = llm.call(prompt, json_mode=True, max_tokens=load_config()["extract_max_tokens"]).get("state_change")
     if not sc:
         return None
     return StateChange(entity=sc["entity"], attribute=sc["attribute"], old=sc.get("old"), new=str(sc["new"]),
@@ -34,9 +34,11 @@ def extract_state_change(obs: Observation, known_attributes: list[str]) -> State
 
 
 def find_roots(delta: StateChange, obs: Observation, store: MemoryStoreAdapter) -> list[str]:
-    """Paper IV-A: same (entity, attribute) OR NLI contradiction(Δ.statement, m.text) >= root_nli_threshold."""
-    thr = load_config()["root_nli_threshold"]
+    """Paper IV-A: same (entity, attribute); only if none, fall back to NLI contradiction(Δ.statement, m.text) >= threshold."""
     ms = store.all()
+    roots = [m.id for m in ms if m.entity == delta.entity and m.attribute == delta.attribute]
+    if roots:
+        return roots
+    thr = load_config()["root_nli_threshold"]
     probs = models.nli_batch([(delta.statement, m.text) for m in ms])
-    return [m.id for m, p in zip(ms, probs)
-            if (m.entity == delta.entity and m.attribute == delta.attribute) or p["contradiction"] >= thr]
+    return [m.id for m, p in zip(ms, probs) if p["contradiction"] >= thr]

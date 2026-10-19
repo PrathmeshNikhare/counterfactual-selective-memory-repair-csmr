@@ -14,6 +14,7 @@ models:
   nli: "cross-encoder/nli-deberta-v3-small"
 
 # Phase A
+extract_max_tokens: 2048   # reasoning model can exhaust 512 before emitting JSON
 root_nli_threshold: 0.8
 
 # Phase B

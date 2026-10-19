@@ -48,8 +48,10 @@ def find_roots(delta: StateChange, obs: Observation, store) -> list[str]
   Attribute should be a short snake_case key (e.g. `vehicle_ownership`, `employment`, `residence`).
   The prompt receives `known_attributes` (attribute keys already in the store) and must reuse one when it fits.
 - `time`, `source` copied from the observation.
-- Roots = memories where (`m.entity == delta.entity` and `m.attribute == delta.attribute`)
-  OR `nli(delta.statement, m.text).contradiction >= cfg.root_nli_threshold` (default 0.8).
+- Roots = memories with `m.entity == delta.entity` and `m.attribute == delta.attribute`.
+  Only if that set is empty, fall back to memories with
+  `nli(delta.statement, m.text).contradiction >= cfg.root_nli_threshold` (default 0.8).
+  (A high-NLI memory alongside an attribute match is a validity dependency, not a root — paper Table II.)
 - No store modification. If `None` → pipeline returns early with empty trace (cheap gating).
 
 ## 3. Phase B — Candidate construction (`pipeline/candidates.py`) — Paper IV-B

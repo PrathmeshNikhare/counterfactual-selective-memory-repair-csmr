@@ -18,7 +18,7 @@ Integration fixture for everything: `data/dev/car_sale.json`.
 
 ## Lane B — Phases A & B
 - [x] **B1 `pipeline/extract.py`** — `extract_state_change`, `find_roots`. *Accept:* car → entity user, attribute ~vehicle_ownership, roots == ["M1"]; "I like pizza" with no conflict → None or no roots.
-- [ ] **B2 `pipeline/candidates.py`**. *Accept:* car → C ⊇ {M1, M2, M3}; M5 ∉ C (M4 may be in C).
+- [x] **B2 `pipeline/candidates.py`**. *Accept:* car → C ⊇ {M1, M2, M3}; M5 ∉ C (M4 may be in C).
 - [ ] **B3 tests** for both across all 6 dev scenarios; log candidate recall vs gold (test-only reading of gold).
 
 ## Lane C — Phase C
