@@ -70,7 +70,7 @@ hedge_patterns: ["\\bmight\\b", "\\bmaybe\\b", "thinking of", "planning to", "no
 temporary_patterns: ["this week", "for now", "temporarily", "\\buntil\\b", "for a few days", "for a week", "at the moment"]
 
 # Phase D objective (paper Section V)
-n_probes: 4
+n_probes: 6
 lambda_c: 0.5       # collateral
 lambda_e: 0.1       # evidence cost
 lambda_s: 0.05      # repair size
@@ -80,6 +80,10 @@ r4_min_pdep: 0.2
 
 # Downstream agent
 agent_top_k: 5
+agent_max_tokens: 1024   # one retry with double this if the answer is empty
+unknown_max_words: 12   # longer answers count as unknown-like only if they START with an unknown pattern
+unknown_patterns: ["\\bunknown\\b", "not sure", "cannot determine", "can't determine", "cannot be determined",
+                   "it is uncertain", "\\buncertain\\b", "do(es)? not know", "no information"]
 
 # Ablations (paper VIII): each flag swaps a stage for its trivial default
 ablation:

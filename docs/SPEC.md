@@ -144,8 +144,10 @@ def is_feasible(rs: RepairSet, cands, cfg) -> bool
 ## 8. Overlay (`pipeline/overlay.py`)
 
 ```python
-def view(store, rs: RepairSet, revised: dict[str,str], conditions: dict[str,str]) -> list[Memory]
+def view(store, rs: RepairSet, revised: dict[str,str], conditions: dict[str,str], new_mem: Memory | None = None) -> list[Memory]
+def observation_memory(delta, obs, store) -> Memory
 ```
+The new observation is itself a memory (`observation_memory`: text = delta.statement, entity/attribute from Δ, source/time from the observation, id `OBS<n>`) and is appended to EVERY view, R0 included. Repair actions apply only to existing memories.
 Per memory: REVOKE → excluded; REVISE → text replaced; VERIFY → text prefixed "[unverified] "; CONDITIONAL → "{text} (only valid if: {condition})"; else unchanged. Never mutates the store.
 
 ## 9. Downstream agent (`pipeline/agent.py`)
@@ -153,20 +155,30 @@ Per memory: REVOKE → excluded; REVISE → text replaced; VERIFY → text prefi
 ```python
 def answer(question: str, memories: list[Memory], k: int = 5) -> str
 ```
-Retrieve top-k by cosine to the question from the given memory list; LLM answers using ONLY those memories; must say "unknown" if not determinable. Same agent is used by all baselines and by eval.
+Retrieve top-k by cosine to the question from the given memory list; LLM answers using ONLY those memories; must say "unknown" if not determinable. An empty LLM answer is retried once (changed prompt, double max tokens), then replaced by "unknown"; an empty answer never reaches the judge. Same agent is used by all baselines and by eval.
 
 ## 10. Counterfactual selection (`pipeline/counterfactual.py`) — Paper IV-D, V
 
 ```python
 def generate_probes(delta, obs, cands, store, n: int) -> list[str]   # LLM; from Δ and candidates ONLY
-def judge(answer: str, question: str, delta, obs) -> float           # 1 consistent / 0.5 unsupported / 0 contradicts
+# NEUTRAL questions about the user's CURRENT state ("How does the user commute to work?"), never mentioning or presupposing the change.
+# One about Δ's attribute, then one per candidate (KEEP-proposed included, so over-repair is detectable), roots/closest hops first, capped at n (config n_probes=6).
+# Probes using a word only the observation introduces (e.g. "sold") are dropped.
+def judge(answer: str, question: str, delta, obs, cfg) -> dict       # ONE call, two explicit steps:
+# {"determined_by_change": bool, "verdict": "consistent"|"vague"|"contradicts"} -> score 1.0 / 0.5 / 0.0
+#   determined_by_change=false: "unknown"/uncertain answers are consistent (1.0)
+#   determined_by_change=true:  "unknown"/vague is vague (0.5); asserting what the change contradicts is 0.0
+# Unknown-like answers (empty, or matching cfg.unknown_patterns when <= cfg.unknown_max_words words, or when the answer starts with a pattern) get the verdict IN CODE: consistent (1.0) if determined_by_change is false, vague (0.5) if true.
+#   The LLM verdict field is used only for answers that make a claim.
+# Probes are always third person ("the user"), never "you".
+# Both fields are stored per probe and per repair set in the trace ("judgements").
 def score(rs, ...) -> dict  # {"benefit","collateral","evidence_cost","size","total"}
 def select(repair_sets, ...) -> tuple[RepairSet, list[dict]]
 ```
 Objective (paper Section V):
 ```
 total = Benefit − λc·Collateral − λe·EvidenceCost − λs·|R|
-Benefit       = mean judge score over probes under view(store, rs)
+Benefit       = mean judge score over probes under view(store, rs, ..., new_mem)  (observation memory included in every view)
 Collateral    = Σ_{m changed (REVISE/REVOKE)} (1 − P_dep(m))          # runtime proxy
 EvidenceCost  = (#VERIFY actions in rs) * cfg.verify_cost + llm_calls_for_rs * cfg.call_cost
 |R|           = number of non-KEEP actions
@@ -182,6 +194,7 @@ EvidenceCost  = (#VERIFY actions in rs) * cfg.verify_cost + llm_calls_for_rs * c
 def commit(store, rs, revised, conditions, obs) -> list[dict]   # version transitions
 def validate(store, probes, delta, obs, expected_benefit) -> dict
 ```
+- The observation memory (`observation_memory`) is added to the store in the same commit (version 1, status active).
 - REVISE → update text; REVOKE → status "revoked"; VERIFY → status "pending_verify", add to pending queue; CONDITIONAL → status "conditional", store condition; all push history.
 - Validation re-runs probes on committed store; warn if |benefit − expected| > 0.01.
 
@@ -205,7 +218,7 @@ Ablation flags (`config.yaml: ablation`):
 
 ## 13. Baselines (`baselines/`)
 
-Each: `def run(obs, store, cfg) -> dict[str, Action]` + revised texts. Same agent, same inputs.
+Each: `def run(obs, store, cfg) -> dict[str, Action]` + revised texts. Same agent, same inputs. Every baseline's final view includes the same appended observation memory (`observation_memory`); only repair actions differ.
 - `append_only`: store observation as new memory, change nothing.
 - `recency`: append; agent instructed to prefer most recent memory.
 - `last_write_wins`: REVISE/REVOKE memories with same entity+attribute as Δ only.

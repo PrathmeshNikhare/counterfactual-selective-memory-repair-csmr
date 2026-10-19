@@ -41,3 +41,14 @@ def test_agent_commute_under_repair_vs_unchanged():
     print(f"\nR0:       {r0}\nrepaired: {repaired}")
     # ponytail: keyword check, not a judge; fine for a smoke test
     assert any(w in repaired.lower() for w in ("unknown", "previously", "no longer", "sold", "not determin"))
+
+
+def test_agent_retries_empty_then_unknown(monkeypatch):
+    from csmr import llm
+    from csmr.pipeline import agent
+    calls = []
+    monkeypatch.setattr(llm, "call", lambda p, **k: calls.append(p) or "")
+    assert agent.answer("q?", []) == "unknown" and len(calls) == 2 and calls[0] != calls[1]
+    calls.clear()
+    monkeypatch.setattr(llm, "call", lambda p, **k: calls.append(p) or ("" if len(calls) == 1 else "Blue."))
+    assert agent.answer("q?", []) == "Blue." and len(calls) == 2
