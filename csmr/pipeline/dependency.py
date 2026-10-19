@@ -11,7 +11,7 @@ from csmr.adapters.base import MemoryStoreAdapter
 from csmr.config import ROOT, load_config
 from csmr.types import CandidateInfo, Memory, Observation, StateChange
 
-CAUSAL_PROMPT = """Does statement B only make sense / stay true if statement A is true?
+CAUSAL_PROMPT = """If statement A stopped being true, would statement B likely need to be re-checked or updated?
 A: {a}
 B: {b}
 Answer yes or no. Return JSON only: {{"answer": "yes" or "no"}}"""
@@ -33,15 +33,16 @@ def dependency_features(root: Memory, cand: Memory, delta: StateChange, obs: Obs
     """Paper IV-C feature vector z for the pair (root, cand); all values in [0, 1]."""
     a, b = models.embed([root.text, cand.text])
     cue = llm.call(CAUSAL_PROMPT.format(a=root.text, b=cand.text), json_mode=True)
+    cue = cue.get("answer", "") if isinstance(cue, dict) else cue
     return {
         "cos_sim": max(0.0, float(a @ b)),
         "same_entity": float(root.entity == cand.entity),
         "same_attribute": float(root.attribute == cand.attribute),
         "nli_entail": models.nli(root.text, cand.text)["entailment"],
-        "nli_contra_new": models.nli(delta.as_sentence(), cand.text)["contradiction"],
+        "nli_contra_new": models.nli(delta.statement or delta.as_sentence(), cand.text)["contradiction"],
         "temporal_after": float(cand.time > root.time),
         "same_source": float(root.source == cand.source),
-        "causal_cue": float(str(cue.get("answer", "")).strip().lower().startswith("y")),
+        "causal_cue": float(str(cue).strip().lower().startswith("y")),
         "hop_closeness": {0: 1.0, 1: 0.6}.get(info.hop, 0.3),
     }
 

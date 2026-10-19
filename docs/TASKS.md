@@ -24,7 +24,7 @@ Integration fixture for everything: `data/dev/car_sale.json`.
 ## Lane C — Phase C
 - [x] **C1 `pipeline/dependency.py`** — features, hand-set weights from config, `fit_dependency`. *Accept:* car → P(M2) ≥ τd, P(M4) < τd, P(M5) not computed (not in C).
 - [x] **C2 `pipeline/evidence.py`** — features, hedge/temporary flags, `fit_evidence`. *Accept:* `bike_maybe.json` → all S < τe; `car_sale.json` → S(M1), S(M2) ≥ τe.
-- [ ] **C3 `pipeline/actions.py`** — `propose_action`, `revise_text`, `condition_text`. *Accept:* car → M1 REVOKE/REVISE, M2 REVISE, M3 VERIFY, M4 KEEP; `phone_repair.json` → CONDITIONAL on the root dependent.
+- [x] **C3 `pipeline/actions.py`** — `propose_action`, `revise_text`, `condition_text`. *Accept:* car → M1 REVOKE/REVISE, M2 REVISE, M3 VERIFY, M4 KEEP; `phone_repair.json` → CONDITIONAL on the root dependent.
 - [ ] **C4** run `method-auditor` on C1–C3; fix findings.
 
 ## Lane D — Phases D & E

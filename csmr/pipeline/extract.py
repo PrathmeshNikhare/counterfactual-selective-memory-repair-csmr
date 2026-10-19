@@ -6,6 +6,7 @@ from csmr.adapters.base import MemoryStoreAdapter
 from csmr.config import load_config
 from csmr.types import Observation, StateChange
 
+# Few-shot examples must never mirror dev/test scenarios (no cars, bikes, jobs, cities, pets, phones).
 EXTRACT_PROMPT = """You read one observation from a user talking to an assistant and decide whether it
 reports a CHANGE in the state of the world that could make previously stored facts outdated.
 
@@ -15,11 +16,20 @@ Attribute keys already used in memory: {known}
 Reuse one of those keys if it fits; otherwise invent a short snake_case key (e.g. vehicle_ownership, employment, residence).
 
 Return JSON only.
-If the observation reports no state change (a preference, a plain fact with nothing to replace), return {{"state_change": null}}.
+Tentative, planned or hedged changes ("might", "planning to", "not sure") MUST still be extracted, with a lower
+confidence; judging how weak the evidence is is not your job. Return null only if the message changes no stored
+fact at all, i.e. nothing stored becomes false or outdated (a new preference, a plain fact with nothing to
+replace): {{"state_change": null}}.
 Otherwise return:
 {{"state_change": {{"entity": "<who/what changed, e.g. user>", "attribute": "<snake_case key>",
 "old": "<previous value or null>", "new": "<new value>", "confidence": <0..1, lower if hedged/uncertain>,
-"statement": "<third-person restatement, e.g. The user sold their car.>"}}}}"""
+"statement": "<third-person restatement, e.g. The user sold their car.>",
+"change_type": "remove" or "replace"}}}}
+change_type:
+- "remove" = the fact stops holding with no new value of the same kind
+  (I cancelled my Netflix subscription, I stopped going to yoga classes)
+- "replace" = a new value of the same kind takes its place
+  (I switched my bank account to HDFC, My favourite team is now Mumbai Indians)"""
 
 
 def extract_state_change(obs: Observation, known_attributes: list[str]) -> StateChange | None:
@@ -30,7 +40,8 @@ def extract_state_change(obs: Observation, known_attributes: list[str]) -> State
         return None
     return StateChange(entity=sc["entity"], attribute=sc["attribute"], old=sc.get("old"), new=str(sc["new"]),
                        time=obs.time, source=obs.source, confidence=float(sc["confidence"]),
-                       statement=sc.get("statement") or obs.text)
+                       statement=sc.get("statement") or obs.text,
+                       change_type="remove" if sc.get("change_type") == "remove" else "replace")
 
 
 def find_roots(delta: StateChange, obs: Observation, store: MemoryStoreAdapter) -> list[str]:

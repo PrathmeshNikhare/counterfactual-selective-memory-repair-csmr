@@ -11,7 +11,7 @@
   ],
   "observation": {"text": "I've moved to Pune permanently, settled in Baner now.", "source": "user", "time": "2026-05-15T10:00:00"},
   "gold": {
-    "actions": {"M1": "REVISE", "M2": "REVOKE", "M3": "KEEP", "M4": "KEEP", "M5": "KEEP"},
+    "actions": {"M1": "REVISE", "M2": "REVISE", "M3": "KEEP", "M4": "KEEP", "M5": "KEEP"},
     "dependencies": [["M1", "M2"]],
     "eval_questions": [
       {"q": "Which city does the user live in?", "gold_answer": "Pune (Baner).", "depends_on": ["M1"]},

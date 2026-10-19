@@ -54,6 +54,7 @@ class StateChange:
     source: str
     confidence: float
     statement: str = ""  # third-person restatement of the observation, e.g. "The user sold their car."
+    change_type: str = "replace"  # "remove" (fact no longer holds) | "replace" (fact has a new value)
 
     def as_sentence(self) -> str:
         return f"The {self.entity}'s {self.attribute.replace('_', ' ')} is now {self.new}."

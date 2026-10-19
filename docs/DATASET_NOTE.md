@@ -13,3 +13,12 @@ Schema rules:
   - `actions`: {memory_id: KEEP|VERIFY|CONDITIONAL|REVISE|REVOKE} for every memory
   - `dependencies`: [[root_id, dependent_id], …]
   - `eval_questions`: [{q, gold_answer, depends_on: [ids]}]
+
+## Labeling conventions
+
+Gold `actions` follow these rules (they mirror the action rule in SPEC §6):
+- **REVOKE** — only for a root whose fact is *removed* (sold, quit, lost).
+- **REVISE** — a root whose fact has a *new value* (moved to Pune, adopted a puppy), and any modified dependent.
+- **VERIFY** — dependents under weak evidence or with an unproven dependency.
+- **CONDITIONAL** — memories affected by a *temporary* change.
+- **KEEP** — everything else.

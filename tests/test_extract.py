@@ -7,13 +7,13 @@ from csmr.scenario import load_scenario
 from csmr.types import Observation, StateChange
 
 CAR = {"state_change": {"entity": "user", "attribute": "vehicle_ownership", "old": "owns a car", "new": "no car",
-                        "confidence": 0.95, "statement": "The user sold their car."}}
+                        "confidence": 0.95, "statement": "The user sold their car.", "change_type": "remove"}}
 
 
 def test_extract_copies_time_source_and_none(monkeypatch):
     monkeypatch.setattr(llm, "call", lambda *a, **k: CAR)
     d = extract_state_change(Observation("I sold my car.", "tool", "2026-06-01"), ["vehicle_ownership"])
-    assert (d.entity, d.attribute, d.time, d.source, d.confidence) == ("user", "vehicle_ownership", "2026-06-01", "tool", 0.95)
+    assert (d.entity, d.attribute, d.time, d.source, d.confidence, d.change_type) == ("user", "vehicle_ownership", "2026-06-01", "tool", 0.95, "remove")
     monkeypatch.setattr(llm, "call", lambda *a, **k: {"state_change": None})
     assert extract_state_change(Observation("I like pizza."), []) is None
 

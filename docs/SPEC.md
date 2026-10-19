@@ -44,7 +44,9 @@ Lazy singletons:
 def extract_state_change(obs: Observation, known_attributes: list[str]) -> StateChange | None
 def find_roots(delta: StateChange, obs: Observation, store) -> list[str]
 ```
-- One LLM call, JSON mode. Prompt asks for `entity, attribute, old, new, confidence, statement` (`statement` = third-person restatement of the observation, e.g. "The user sold their car."), or `{"state_change": null}`.
+- One LLM call, JSON mode. Prompt asks for `entity, attribute, old, new, confidence, statement, change_type` (`statement` = third-person restatement of the observation, e.g. "The user sold their car."), or `{"state_change": null}`.
+  `change_type` ∈ {`remove` (fact stops holding with no new value of the same kind: "I cancelled my Netflix subscription", "I stopped going to yoga classes"), `replace` (a new value of the same kind: "I switched my bank account to HDFC", "My favourite team is now Mumbai Indians")} — the prompt carries these as few-shot examples, which must never mirror dev/test scenarios; stored on `StateChange.change_type` (default `replace`).
+  Tentative / planned / hedged changes ("might", "planning to") are still extracted, with lower confidence; `null` only when the message changes no stored fact. Weak evidence is judged in Phase C, not here.
   Attribute should be a short snake_case key (e.g. `vehicle_ownership`, `employment`, `residence`).
   The prompt receives `known_attributes` (attribute keys already in the store) and must reuse one when it fits.
 - `time`, `source` copied from the observation.
@@ -78,10 +80,10 @@ Features (all in [0,1]):
 | `same_entity` | 1/0 |
 | `same_attribute` | 1/0 |
 | `nli_entail` | nli(root.text, cand.text).entailment |
-| `nli_contra_new` | nli(delta_sentence, cand.text).contradiction, where delta_sentence = "The {entity}'s {attribute} is now {new}." |
+| `nli_contra_new` | nli(delta.statement, cand.text).contradiction (falls back to "The {entity}'s {attribute} is now {new}." if statement is empty) |
 | `temporal_after` | cand written after root (1/0) |
 | `same_source` | 1/0 |
-| `causal_cue` | LLM yes/no → 1/0: "Does statement B only make sense / stay true if statement A is true? A: … B: … Answer yes or no." |
+| `causal_cue` | LLM yes/no (JSON `{"answer": "yes"|"no"}`) → 1/0: "If statement A stopped being true, would statement B likely need to be re-checked or updated? A: {root.text} B: {cand.text} Answer yes or no." |
 | `hop_closeness` | 1.0 hop0, 0.6 hop1, 0.3 hop2 |
 
 For a candidate with multiple roots: P = max over roots. Root itself: P = 1.0.
@@ -117,8 +119,8 @@ def condition_text(mem: Memory, delta, obs) -> str       # one LLM call
 Rule (encodes Section V constraints):
 ```
 if mid not in C:                                   KEEP
-elif is_root and S >= τe and direct contradiction: REVOKE   (contradiction_strength ≥ 0.5 or old/new exclusive)
-elif P >= τd and S >= τe:                          REVISE
+elif is_root and S >= τe:                          REVOKE if delta.change_type == "remove" else REVISE
+elif P >= τd and S >= τe:                          REVISE   (any modified non-root)
 elif P >= τd and info.temporary:                   CONDITIONAL
 elif P >= τd:                                      VERIFY
 else:                                              KEEP

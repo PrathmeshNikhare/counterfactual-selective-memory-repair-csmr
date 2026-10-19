@@ -25,7 +25,6 @@ hop_sim: 0.35
 # Phase C thresholds
 tau_d: 0.5          # dependency threshold
 tau_e: 0.6          # evidence sufficiency threshold (paper τe)
-revoke_contradiction: 0.5
 
 # Hand-set starting weights (logistic regression). Replaced by models/*.json after fit().
 # Tuning these on data/dev is allowed until the dataset exists.
@@ -42,12 +41,12 @@ dependency_weights:
   hop_closeness: 1.0
 
 evidence_weights:
-  intercept: -7.5
+  intercept: -14.5
   source_reliability: 1.5
-  directness: 1.5
+  directness: 5.0
   contradiction_strength: 3.0
   not_hedged: 3.0
-  not_temporary: 1.5
+  not_temporary: 5.0
   corroboration: 0.5
   extraction_conf: 1.0
   freshness: 0.5
