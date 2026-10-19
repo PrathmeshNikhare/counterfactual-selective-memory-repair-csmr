@@ -3,7 +3,7 @@
 seed: 42
 
 llm:
-  model: "llama-3.1-8b-instant"        # any OpenAI-compatible model name; base_url/key come from .env
+  model: "openai/gpt-oss-20b"        # any OpenAI-compatible model name; base_url/key come from .env
   judge_model: null                     # null = same as model
   temperature: 0
   max_retries: 4
