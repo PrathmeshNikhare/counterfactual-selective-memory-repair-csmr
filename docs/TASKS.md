@@ -17,7 +17,7 @@ Integration fixture for everything: `data/dev/car_sale.json`.
 - [ ] **A6 `csmr/api.py`** + `examples/chat_agent.py` (terminal loop: observe → retrieve → answer). *Accept:* typing "I sold my car" then "how do I get to work?" gives a non-car answer.
 
 ## Lane B — Phases A & B
-- [ ] **B1 `pipeline/extract.py`** — `extract_state_change`, `find_roots`. *Accept:* car → entity user, attribute ~vehicle_ownership, roots == ["M1"]; "I like pizza" with no conflict → None or no roots.
+- [x] **B1 `pipeline/extract.py`** — `extract_state_change`, `find_roots`. *Accept:* car → entity user, attribute ~vehicle_ownership, roots == ["M1"]; "I like pizza" with no conflict → None or no roots.
 - [ ] **B2 `pipeline/candidates.py`**. *Accept:* car → C ⊇ {M1, M2, M3}; M5 ∉ C (M4 may be in C).
 - [ ] **B3 tests** for both across all 6 dev scenarios; log candidate recall vs gold (test-only reading of gold).
 
