@@ -43,3 +43,33 @@ def test_fit_roundtrip(tmp_path, monkeypatch):
     x0 = dict.fromkeys(dependency.FEATURES, 0.0)
     dependency.fit_dependency([x1, x0, x1, x0], [1, 0, 1, 0])
     assert dependency.dependency_prob(x1) > 0.5 > dependency.dependency_prob(x0)
+
+
+def _cue(monkeypatch, fn):
+    sc = load_scenario("data/dev/car_sale.json")
+    store, d = InMemoryAdapter(sc.memories), _car_delta(sc)
+    info = build_candidates(d, sc.observation, ["M1"], store)["M2"]
+    monkeypatch.setattr(llm, "call", fn)
+    llm.reset_stats()
+    f = dependency.dependency_features(store.get("M1"), store.get("M2"), d, sc.observation, info)
+    return f["causal_cue"]
+
+
+@pytest.mark.parametrize("bad", [{}, {"answer": ""}, {"answer": "maybe"}])
+def test_malformed_cue_retries_once_then_no(monkeypatch, bad):
+    prompts = []
+    assert _cue(monkeypatch, lambda p, **k: prompts.append(p) or bad) == 0.0
+    assert len(prompts) == 2 and prompts[0] != prompts[1]
+    assert llm.stats()["fallbacks"] == {"causal_cue": 1}
+
+
+def test_cue_retry_success_is_not_a_fallback(monkeypatch):
+    outs = iter([{}, {"answer": "Yes"}])
+    assert _cue(monkeypatch, lambda p, **k: next(outs)) == 1.0
+    assert llm.stats()["fallbacks"] == {}
+
+
+def test_cue_max_tokens_from_config(monkeypatch):
+    seen = []
+    _cue(monkeypatch, lambda p, **k: seen.append(k["max_tokens"]) or {"answer": "no"})
+    assert seen == [load_config()["cue_max_tokens"]]

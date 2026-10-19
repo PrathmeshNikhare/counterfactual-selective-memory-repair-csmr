@@ -30,7 +30,7 @@ def test_commit_versions_history_and_pending():
 
 def test_validate_warns_on_mismatch(monkeypatch):
     store, delta, obs = _setup()
-    monkeypatch.setattr(C, "answer", lambda q, m: "unknown")
+    monkeypatch.setattr(C, "answer", lambda q, m, **k: "unknown")
     monkeypatch.setattr(C, "judge", lambda *a: {"score": 1.0})
     cfg = {"validation_tol": 0.01}
     assert C.validate(store, ["q"], delta, obs, 1.0, cfg)["ok"]

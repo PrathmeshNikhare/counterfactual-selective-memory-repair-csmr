@@ -29,7 +29,7 @@ def _setup(monkeypatch):
     sets = generate_repair_sets(cands, prop, CFG)
     revised = {"M2": "The user previously drove to work by car; commute now unknown."}
     # fake agent returns the whole view; fake judge checks which stale facts survive
-    monkeypatch.setattr(cf, "answer", lambda q, mems: " ".join(m.text for m in mems))
+    monkeypatch.setattr(cf, "answer", lambda q, mems, **k: " ".join(m.text for m in mems))
 
     def fake_judge(a, q, d, o, cfg):
         if "own" in q:
@@ -274,3 +274,13 @@ def test_near_ties_prefer_smaller_set(monkeypatch):
     monkeypatch.setattr(cf, "_evaluate", fake_eval)
     best, _ = cf.select([small, big], probes, store, revised, {}, cands, DELTA, obs, CFG)
     assert best.name == "R1"
+
+
+def test_ablation_infeasible_r3_falls_back_to_largest_feasible_lower_set(monkeypatch):
+    store, cands, _, revised, probes, obs = _setup(monkeypatch)
+    cands["M1"].s_evidence = 0.3  # weak-evidence root: R1+ force it to REVISE -> infeasible
+    sets = generate_repair_sets(cands, {"M1": Action.KEEP, "M2": Action.REVISE}, CFG)
+    assert [r.name for r in sets if not r.feasible] == ["R1", "R2", "R4"]  # R3 deduplicated into R2
+    cfg = {**CFG, "ablation": {**CFG["ablation"], "use_counterfactual": False}}
+    best, _ = cf.select(sets, probes, store, revised, {}, cands, DELTA, obs, cfg)
+    assert best.name == "R0"

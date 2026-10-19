@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from csmr import llm
+from csmr.config import load_config
 from csmr.types import Action, CandidateInfo, Memory, Observation, StateChange
 
 REVISE_PROMPT = """A stored memory may be outdated because of a new observation. Rewrite the memory so it stays
@@ -20,6 +21,8 @@ Memory: "{memory}"
 New observation ({time}): "{obs}"
 Change: {statement}
 Return JSON only: {{"condition": "<condition clause>"}}"""
+REVISE_FALLBACK = "Previously: {text}. Possibly outdated after: {statement}"
+CONDITION_FALLBACK = "it is not affected by: {statement}"
 
 
 def propose_action(mid: str, info: CandidateInfo | None, cfg: dict, change_type: str = "replace") -> Action:
@@ -37,15 +40,27 @@ def propose_action(mid: str, info: CandidateInfo | None, cfg: dict, change_type:
     return Action.VERIFY if dependent else Action.KEEP
 
 
-def _ask(prompt: str, key: str, mem: Memory, delta: StateChange, obs: Observation) -> str:
-    out = llm.call(prompt.format(memory=mem.text, time=obs.time, obs=obs.text, statement=delta.statement or obs.text),
-                   json_mode=True)
-    return str(out[key]).strip()
+def _ask(prompt: str, key: str, mem: Memory, delta: StateChange, obs: Observation, cfg: dict | None) -> str | None:
+    """Rewrite text for mem, or None (after one retry) if the response is malformed."""
+    cfg = cfg or load_config()
+    out = llm.try_json_valid(
+        prompt.format(memory=mem.text, time=obs.time, obs=obs.text, statement=delta.statement or obs.text),
+        lambda o: bool(str(o.get(key) or "").strip()), max_tokens=cfg["rewrite_max_tokens"],
+        cfg=cfg)
+    return str(out[key]).strip() if out else None
 
 
-def revise_text(mem: Memory, delta: StateChange, obs: Observation) -> str:
-    return _ask(REVISE_PROMPT, "text", mem, delta, obs)
+def revise_text(mem: Memory, delta: StateChange, obs: Observation, cfg: dict | None = None) -> str:
+    text = _ask(REVISE_PROMPT, "text", mem, delta, obs, cfg)
+    if text is None:
+        llm.fallback("revise_text", f"malformed response for {mem.id}; template text")
+        text = REVISE_FALLBACK.format(text=mem.text.rstrip(". "), statement=delta.statement or obs.text)
+    return text
 
 
-def condition_text(mem: Memory, delta: StateChange, obs: Observation) -> str:
-    return _ask(CONDITION_PROMPT, "condition", mem, delta, obs)
+def condition_text(mem: Memory, delta: StateChange, obs: Observation, cfg: dict | None = None) -> str:
+    cond = _ask(CONDITION_PROMPT, "condition", mem, delta, obs, cfg)
+    if cond is None:
+        llm.fallback("condition_text", f"malformed response for {mem.id}; template condition")
+        cond = CONDITION_FALLBACK.format(statement=delta.statement or obs.text)
+    return cond

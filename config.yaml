@@ -7,6 +7,8 @@ llm:
   judge_model: null                     # null = same as model
   temperature: 0
   max_retries: 4
+  backoff_base_s: 1     # rate-limit sleep = backoff_base_s * 2**attempt
+  max_tokens: 512       # default when a caller passes none
   cache_dir: ".cache/llm"
 
 models:
@@ -79,6 +81,8 @@ call_cost: 0.0
 tie_eps: 1.0e-6        # totals within this are tied -> smaller |R| wins
 probe_max_tokens: 2048  # reasoning model needs headroom before the JSON
 judge_max_tokens: 1024
+cue_max_tokens: 1024      # dependency causal-cue call
+rewrite_max_tokens: 1024  # REVISE text / CONDITIONAL condition calls
 validation_tol: 0.01   # Phase E: warn if |committed benefit - expected| exceeds this
 r4_min_pdep: 0.2
 

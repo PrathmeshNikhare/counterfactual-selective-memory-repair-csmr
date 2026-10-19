@@ -21,20 +21,24 @@ FEATURES = ["cos_sim", "same_entity", "same_attribute", "nli_entail", "nli_contr
 _MODEL_FILE = ROOT / "models" / "dependency.json"
 
 
-def _weights() -> dict[str, float]:
+def _weights(cfg: dict | None = None) -> dict[str, float]:
     """Fitted coefficients if models/dependency.json exists, else hand-set config weights."""
     if _MODEL_FILE.exists():
         return json.loads(_MODEL_FILE.read_text())
-    return load_config()["dependency_weights"]
+    return (cfg or load_config())["dependency_weights"]
 
 
 def dependency_features(root: Memory, cand: Memory, delta: StateChange, obs: Observation,
-                        info: CandidateInfo) -> dict[str, float]:
+                        info: CandidateInfo, cfg: dict | None = None) -> dict[str, float]:
     """Paper IV-C feature vector z for the pair (root, cand); all values in [0, 1]."""
-    cfg = load_config()
+    cfg = cfg or load_config()
     a, b = models.embed([root.text, cand.text])
-    cue = llm.call(CAUSAL_PROMPT.format(a=root.text, b=cand.text), json_mode=True)
-    cue = cue.get("answer", "") if isinstance(cue, dict) else cue
+    cue = llm.try_json_valid(CAUSAL_PROMPT.format(a=root.text, b=cand.text),
+                             lambda o: str(o.get("answer", "")).strip().lower()[:1] in ("y", "n"),
+                             max_tokens=cfg["cue_max_tokens"], cfg=cfg)
+    if cue is None:
+        llm.fallback("causal_cue", f"malformed response for {cand.id}; cue = no")
+        cue = {"answer": "no"}
     return {
         "cos_sim": max(0.0, float(a @ b)),
         "same_entity": float(root.entity == cand.entity),
@@ -43,31 +47,32 @@ def dependency_features(root: Memory, cand: Memory, delta: StateChange, obs: Obs
         "nli_contra_new": models.nli(delta.statement or delta.as_sentence(), cand.text)["contradiction"],
         "temporal_after": float(cand.time > root.time),
         "same_source": float(root.source == cand.source),
-        "causal_cue": float(str(cue).strip().lower().startswith("y")),
+        "causal_cue": float(str(cue["answer"]).strip().lower().startswith("y")),
         "hop_closeness": cfg["hop_closeness"].get(info.hop, cfg["hop_default"]),
     }
 
 
-def dependency_prob(features: dict[str, float]) -> float:
-    w = _weights()
+def dependency_prob(features: dict[str, float], cfg: dict | None = None) -> float:
+    w = _weights(cfg)
     z = w["intercept"] + sum(w[k] * v for k, v in features.items())
     return 1.0 / (1.0 + math.exp(-z))
 
 
 def assess_dependency(cands: dict[str, CandidateInfo], store: MemoryStoreAdapter, delta: StateChange,
-                      obs: Observation) -> None:
+                      obs: Observation, cfg: dict | None = None) -> None:
     """Fill dep_features / p_dep on every candidate in place. Roots get 1.0; others max over roots."""
     mems = {m.id: m for m in store.all()}
     roots = [i for i, c in cands.items() if c.is_root]
-    use = load_config()["ablation"]["use_dependency"]
+    cfg = cfg or load_config()
+    use = cfg["ablation"]["use_dependency"]
     for mid, info in cands.items():
         if info.is_root or not use:  # use_dependency=false: trivial default P = 1, no NLI/LLM calls
             info.p_dep = 1.0
             continue
         best = None
         for r in roots:
-            f = dependency_features(mems[r], mems[mid], delta, obs, info)
-            p = dependency_prob(f)
+            f = dependency_features(mems[r], mems[mid], delta, obs, info, cfg)
+            p = dependency_prob(f, cfg)
             if best is None or p > best[0]:
                 best = (p, f)
         if best:

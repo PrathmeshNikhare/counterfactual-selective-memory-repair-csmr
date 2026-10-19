@@ -8,9 +8,9 @@ from csmr.types import CandidateInfo, Observation, StateChange
 
 
 def build_candidates(delta: StateChange, obs: Observation, roots: list[str],
-                     store: MemoryStoreAdapter) -> dict[str, CandidateInfo]:
+                     store: MemoryStoreAdapter, cfg: dict | None = None) -> dict[str, CandidateInfo]:
     """Paper IV-B: roots ∪ (top-K by cosine, entity/attribute-filtered) ∪ 1..max_hops expansion from roots."""
-    cfg = load_config()
+    cfg = cfg or load_config()
     mems = {m.id: m for m in store.all()}
     ids = list(mems)
     if not ids:

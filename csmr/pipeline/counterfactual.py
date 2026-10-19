@@ -56,12 +56,13 @@ def _presupposes(q: str, obs: Observation, cands: dict[str, CandidateInfo], stor
 
 
 def generate_probes(delta: StateChange, obs: Observation, cands: dict[str, CandidateInfo],
-                    store: MemoryStoreAdapter, n: int) -> list[str]:
+                    store: MemoryStoreAdapter, n: int, cfg: dict | None = None) -> list[str]:
     """One neutral probe about Delta's attribute, then one per candidate (roots/closest hops first, KEEP included),
     presupposing probes dropped, capped at n."""
+    cfg = cfg or load_config()
     mems = "\n".join(f"- {m}: {store.get(m).text}" for m in cands)
     out = llm.try_json(PROBE_PROMPT.format(attribute=delta.attribute.replace("_", " "), memories=mems),
-                       max_tokens=load_config()["probe_max_tokens"])
+                       max_tokens=cfg["probe_max_tokens"], cfg=cfg)
     order = sorted(cands, key=lambda m: (not cands[m].is_root, cands[m].hop, m))
     if (out is None or not str(out.get("change_question") or "").strip()
             or not isinstance(out.get("memory_questions"), dict)):
@@ -90,7 +91,7 @@ def judge(ans: str, question: str, delta: StateChange, obs: Observation, cfg: di
     prompt = JUDGE_PROMPT.format(time=obs.time, obs=obs.text, statement=delta.statement or obs.text,
                                  question=question, answer=ans)
     for p in (prompt, prompt + RETRY_NUDGE):
-        out = llm.try_json(p, model=cfg["llm"]["judge_model"], max_tokens=cfg["judge_max_tokens"])
+        out = llm.try_json(p, model=cfg["llm"]["judge_model"], max_tokens=cfg["judge_max_tokens"], cfg=cfg)
         if out is not None and isinstance(out.get("determined_by_change"), bool) and (
                 unknown or str(out.get("verdict")).strip().lower() in VERDICT_SCORE):
             break
@@ -106,16 +107,16 @@ def judge(ans: str, question: str, delta: StateChange, obs: Observation, cfg: di
 
 
 def prepare_texts(repair_sets: list[RepairSet], store: MemoryStoreAdapter, delta: StateChange,
-                  obs: Observation) -> tuple[dict[str, str], dict[str, str]]:
+                  obs: Observation, cfg: dict | None = None) -> tuple[dict[str, str], dict[str, str]]:
     """REVISE texts and CONDITIONAL conditions needed by any set (one LLM call per memory; llm.call caches)."""
     revised: dict[str, str] = {}
     conditions: dict[str, str] = {}
     for rs in repair_sets:
         for mid, a in rs.actions.items():
             if a == Action.REVISE and mid not in revised:
-                revised[mid] = revise_text(store.get(mid), delta, obs)
+                revised[mid] = revise_text(store.get(mid), delta, obs, cfg)
             elif a == Action.CONDITIONAL and mid not in conditions:
-                conditions[mid] = condition_text(store.get(mid), delta, obs)
+                conditions[mid] = condition_text(store.get(mid), delta, obs, cfg)
     return revised, conditions
 
 
@@ -127,7 +128,7 @@ def _evaluate(rs: RepairSet, probes: list[str], store: MemoryStoreAdapter, revis
     details = []
     for q in probes:  # identical views reuse answers/judgements
         if (q, vhash) not in cache:
-            a = answer(q, mems)
+            a = answer(q, mems, cfg=cfg)
             cache[(q, vhash)] = {"question": q, "answer": a, **judge(a, q, delta, obs, cfg)}
         details.append(cache[(q, vhash)])
     vals = [d["score"] for d in details]
@@ -164,8 +165,10 @@ def select(repair_sets: list[RepairSet], probes: list[str], store: MemoryStoreAd
                                                    cache, new_mem)
         top = max(r.score["total"] for r in feasible)  # near-ties (within tie_eps) fall through to smaller |R|
         best = min((r for r in feasible if r.score["total"] >= top - cfg["tie_eps"]), key=lambda r: r.score["size"])
-    else:  # ablation: apply all proposed actions (R3; dedup may have renamed it to a lower-index twin)
-        best = [rs for rs in feasible if rs.name <= "R3"][-1]
+    else:  # ablation (SPEC §10): R3 = apply all proposed actions; dedup may have renamed it to a lower-index twin
+        r3 = [rs for rs in repair_sets if rs.name <= "R3"][-1]
+        # hard rules still bind: an infeasible R3 (weak-evidence root forced to REVISE) falls back to the largest feasible lower set
+        best = r3 if r3.feasible else [rs for rs in feasible if rs.name < r3.name][-1]
     rows = [{"name": rs.name, "actions": {k: v.value for k, v in rs.actions.items()}, "feasible": rs.feasible,
              "infeasible_reason": rs.infeasible_reason, "score": rs.score, "judgements": details.get(rs.name, []), "chosen": rs is best}
             for rs in repair_sets]

@@ -32,10 +32,11 @@ change_type:
   (I switched my bank account to HDFC, My favourite team is now Mumbai Indians)"""
 
 
-def extract_state_change(obs: Observation, known_attributes: list[str]) -> StateChange | None:
+def extract_state_change(obs: Observation, known_attributes: list[str], cfg: dict | None = None) -> StateChange | None:
     """Paper IV-A: Δ = (entity, attribute, old, new, time, source, confidence). One LLM call."""
     prompt = EXTRACT_PROMPT.format(text=obs.text, known=sorted(set(known_attributes)) or "none")
-    out = llm.try_json(prompt, max_tokens=load_config()["extract_max_tokens"])
+    cfg = cfg or load_config()
+    out = llm.try_json(prompt, max_tokens=cfg["extract_max_tokens"], cfg=cfg)
     if out is None or "state_change" not in out:
         llm.fallback("extract", "malformed response; treated as no state change")
         return None
@@ -52,12 +53,12 @@ def extract_state_change(obs: Observation, known_attributes: list[str]) -> State
         return None
 
 
-def find_roots(delta: StateChange, obs: Observation, store: MemoryStoreAdapter) -> list[str]:
+def find_roots(delta: StateChange, obs: Observation, store: MemoryStoreAdapter, cfg: dict | None = None) -> list[str]:
     """Paper IV-A: same (entity, attribute); only if none, fall back to NLI contradiction(Δ.statement, m.text) >= threshold."""
     ms = store.all()
     roots = [m.id for m in ms if m.entity == delta.entity and m.attribute == delta.attribute]
     if roots:
         return roots
-    thr = load_config()["root_nli_threshold"]
+    thr = (cfg or load_config())["root_nli_threshold"]
     probs = models.nli_batch([(delta.statement, m.text) for m in ms])
     return [m.id for m, p in zip(ms, probs) if p["contradiction"] >= thr]

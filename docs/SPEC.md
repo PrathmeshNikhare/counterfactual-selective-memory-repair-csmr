@@ -185,7 +185,7 @@ EvidenceCost  = (#VERIFY actions in rs) * cfg.verify_cost + llm_calls_for_rs * c
 ```
 - argmax over feasible sets; ties → smaller |R|.
 - Cache answers by (question, hash of view) — identical views reuse results.
-- Malformed LLM JSON never crashes a run; each fallback is counted in `Trace.llm_stats["fallbacks"]` (`llm.fallback(kind)`): extract (missing/invalid keys) → no state change; probes (missing/invalid) → one template probe per candidate, "Is it still true that <memory text>?"; judge → retried once with a changed prompt, then verdict "vague" (0.5), `determined_by_change` null.
+- Malformed LLM JSON never crashes a run; each fallback is counted in `Trace.llm_stats["fallbacks"]` (`llm.fallback(kind)`): extract (missing/invalid keys) → no state change; probes (missing/invalid) → one template probe per candidate, "Is it still true that <memory text>?"; judge → retried once with a changed prompt, then verdict "vague" (0.5), `determined_by_change` null.; causal cue (dependency) → retried once, then "no"; REVISE text → retried once, then template "Previously: <text>. Possibly outdated after: <statement>"; CONDITIONAL condition → retried once, then "it is not affected by: <statement>" (kinds `causal_cue`, `revise_text`, `condition_text`).
 - Ties: totals within `cfg.tie_eps` are tied → smaller |R|. Token budgets: `cfg.probe_max_tokens`, `cfg.judge_max_tokens`.
 - Ablation `use_counterfactual=false`: select R3 (apply all proposed actions) without probes.
 - Ablation `use_minimality=false`: λc = λs = 0.

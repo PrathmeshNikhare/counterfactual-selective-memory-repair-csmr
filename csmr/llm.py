@@ -18,6 +18,7 @@ log = logging.getLogger(__name__)
 _cache: diskcache.Cache | None = None
 _client = None
 _JSON_NUDGE = "Return valid JSON only."
+_SHAPE_NUDGE = "\nReturn exactly the JSON object described above."  # changes the prompt so the disk cache is not hit again
 
 
 def stats() -> dict:
@@ -36,18 +37,17 @@ def fallback(kind: str, detail: str = "") -> None:
     log.warning("LLM fallback [%s] %s", kind, detail)
 
 
-def _get_cache() -> diskcache.Cache:
+def _get_cache(cfg: dict) -> diskcache.Cache:
     global _cache
-    if _cache is None:
-        d = load_config()["llm"]["cache_dir"]
-        _cache = diskcache.Cache(str(ROOT / d))
+    if _cache is None:  # process-wide: cache_dir is read once, on first use
+        _cache = diskcache.Cache(str(ROOT / cfg["llm"]["cache_dir"]))
     return _cache
 
 
-def _complete(model: str, system: str | None, prompt: str, json_mode: bool, max_tokens: int) -> str:
+def _complete(model: str, system: str | None, prompt: str, json_mode: bool, max_tokens: int, cfg: dict) -> str:
     """The only function that touches the API (tests stub this)."""
     global _client
-    cfg = load_config()["llm"]
+    cfg = cfg["llm"]
     if _client is None:
         from openai import OpenAI
 
@@ -64,25 +64,42 @@ def _complete(model: str, system: str | None, prompt: str, json_mode: bool, max_
         except Exception as e:  # openai.RateLimitError et al.; only back off on rate limits
             if type(e).__name__ != "RateLimitError" or attempt == cfg["max_retries"]:
                 raise
-            time.sleep(2**attempt)
+            time.sleep(cfg["backoff_base_s"] * 2**attempt)
 
 
-def call(prompt: str, *, system: str | None = None, json_mode: bool = False,
-         model: str | None = None, max_tokens: int = 512) -> str | dict:
-    model = model or load_config()["llm"]["model"]
+def _json_mode_error(e: Exception) -> bool:
+    """Provider-side JSON-mode rejection (e.g. Groq 400 json_validate_failed): same as invalid JSON."""
+    return type(e).__name__ == "BadRequestError" and "json" in str(e).lower()
+
+
+def _complete_json(model: str, system: str | None, prompt: str, max_tokens: int, cfg: dict) -> dict:
+    try:
+        return json.loads(_complete(model, system, prompt, True, max_tokens, cfg))
+    except Exception as e:
+        if _json_mode_error(e):
+            raise json.JSONDecodeError(str(e), "", 0) from e
+        raise
+
+
+def call(prompt: str, *, system: str | None = None, json_mode: bool = False, model: str | None = None,
+         max_tokens: int | None = None, cfg: dict | None = None) -> str | dict:
+    cfg = cfg or load_config()
+    model = model or cfg["llm"]["model"]
+    max_tokens = max_tokens or cfg["llm"]["max_tokens"]
     key = hashlib.sha256(json.dumps([model, system, prompt, json_mode]).encode()).hexdigest()
-    cache = _get_cache()
+    cache = _get_cache(cfg)
     _stats["calls"] += 1
     if key in cache:
         _stats["hits"] += 1
         return cache[key]
     _stats["misses"] += 1
-    out = _complete(model, system, prompt, json_mode, max_tokens)
     if json_mode:
         try:
-            out = json.loads(out)
+            out = _complete_json(model, system, prompt, max_tokens, cfg)
         except json.JSONDecodeError:
-            out = json.loads(_complete(model, system, f"{prompt}\n\n{_JSON_NUDGE}", json_mode, max_tokens))
+            out = _complete_json(model, system, f"{prompt}\n\n{_JSON_NUDGE}", max_tokens, cfg)
+    else:
+        out = _complete(model, system, prompt, False, max_tokens, cfg)
     cache[key] = out  # only successes are cached
     return out
 
@@ -94,3 +111,12 @@ def try_json(prompt: str, **kw) -> dict | None:
     except json.JSONDecodeError:
         return None
     return out if isinstance(out, dict) else None
+
+
+def try_json_valid(prompt: str, ok, **kw) -> dict | None:
+    """`try_json` that also requires ok(out); retries once with a changed prompt, then returns None (caller falls back)."""
+    for p in (prompt, prompt + _SHAPE_NUDGE):
+        out = try_json(p, **kw)
+        if out is not None and ok(out):
+            return out
+    return None

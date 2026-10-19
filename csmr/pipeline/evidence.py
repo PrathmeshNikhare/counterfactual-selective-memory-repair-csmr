@@ -17,11 +17,11 @@ FEATURES = ["source_reliability", "directness", "contradiction_strength", "not_h
 _MODEL_FILE = ROOT / "models" / "evidence.json"
 
 
-def _weights() -> dict[str, float]:
+def _weights(cfg: dict | None = None) -> dict[str, float]:
     """Fitted coefficients if models/evidence.json exists, else hand-set config weights."""
     if _MODEL_FILE.exists():
         return json.loads(_MODEL_FILE.read_text())
-    return load_config()["evidence_weights"]
+    return (cfg or load_config())["evidence_weights"]
 
 
 def _matches(patterns: list[str], text: str) -> bool:
@@ -29,9 +29,9 @@ def _matches(patterns: list[str], text: str) -> bool:
 
 
 def evidence_features(cand: Memory, delta: StateChange, obs: Observation, info: CandidateInfo,
-                      corroboration: int = 1) -> dict[str, float]:
+                      corroboration: int = 1, cfg: dict | None = None) -> dict[str, float]:
     """Paper IV-C feature vector for (observation, cand); also sets info.hedged / info.temporary."""
-    cfg = load_config()
+    cfg = cfg or load_config()
     info.hedged = _matches(cfg["hedge_patterns"], obs.text)
     info.temporary = _matches(cfg["temporary_patterns"], obs.text)
     return {
@@ -46,21 +46,22 @@ def evidence_features(cand: Memory, delta: StateChange, obs: Observation, info: 
     }
 
 
-def evidence_score(features: dict[str, float]) -> float:
+def evidence_score(features: dict[str, float], cfg: dict | None = None) -> float:
     """S(E, m)."""
-    w = _weights()
+    w = _weights(cfg)
     return 1.0 / (1.0 + math.exp(-(w["intercept"] + sum(w[k] * v for k, v in features.items()))))
 
 
 def assess_evidence(cands: dict[str, CandidateInfo], store: MemoryStoreAdapter, delta: StateChange,
-                    obs: Observation) -> None:
+                    obs: Observation, cfg: dict | None = None) -> None:
     """Fill ev_features / s_evidence / hedged / temporary on every candidate in place.
     ablation.use_evidence=false swaps the stage for its trivial default S = 1."""
-    use = load_config()["ablation"]["use_evidence"]
+    cfg = cfg or load_config()
+    use = cfg["ablation"]["use_evidence"]
     mems = {m.id: m for m in store.all()}
     for mid, info in cands.items():
-        info.ev_features = evidence_features(mems[mid], delta, obs, info)
-        info.s_evidence = evidence_score(info.ev_features) if use else 1.0
+        info.ev_features = evidence_features(mems[mid], delta, obs, info, cfg=cfg)
+        info.s_evidence = evidence_score(info.ev_features, cfg) if use else 1.0
 
 
 def fit_evidence(X: list[dict[str, float]], y: list[int]) -> None:

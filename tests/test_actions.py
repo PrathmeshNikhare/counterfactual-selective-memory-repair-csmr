@@ -1,3 +1,5 @@
+import pytest
+
 from csmr import llm
 from csmr.adapters.memory import InMemoryAdapter
 from csmr.config import load_config
@@ -41,3 +43,37 @@ def test_text_helpers(monkeypatch):
     monkeypatch.setattr(llm, "call", lambda p, **k: {"text": " T ", "condition": " C "})
     assert actions.revise_text(sc.memories[1], d, sc.observation) == "T"
     assert actions.condition_text(sc.memories[1], d, sc.observation) == "C"
+
+
+@pytest.mark.parametrize("bad", [{}, {"text": ""}, {"other": "x"}])
+def test_malformed_rewrites_retry_once_then_template(monkeypatch, bad):
+    sc = load_scenario("data/dev/car_sale.json")
+    d = StateChange("user", "vehicle_ownership", "car", "none", sc.observation.time, "user", 0.9, "The user sold their car.")
+    prompts = []
+    monkeypatch.setattr(llm, "call", lambda p, **k: prompts.append(p) or bad)
+    llm.reset_stats()
+    m = sc.memories[1]
+    assert actions.revise_text(m, d, sc.observation) == f"Previously: {m.text.rstrip('. ')}. Possibly outdated after: The user sold their car."
+    assert len(prompts) == 2 and prompts[0] != prompts[1]
+    assert actions.condition_text(m, d, sc.observation) == "it is not affected by: The user sold their car."
+    assert llm.stats()["fallbacks"] == {"revise_text": 1, "condition_text": 1}
+
+
+def test_rewrite_retry_success_is_not_a_fallback(monkeypatch):
+    sc = load_scenario("data/dev/car_sale.json")
+    d = StateChange("user", "vehicle_ownership", "car", "none", sc.observation.time, "user", 0.9, "x")
+    outs = iter([{}, {"text": "ok"}])
+    monkeypatch.setattr(llm, "call", lambda p, **k: next(outs))
+    llm.reset_stats()
+    assert actions.revise_text(sc.memories[1], d, sc.observation) == "ok"
+    assert llm.stats()["fallbacks"] == {}
+
+
+def test_rewrite_max_tokens_from_config(monkeypatch):
+    sc = load_scenario("data/dev/car_sale.json")
+    d = StateChange("user", "vehicle_ownership", "car", "none", sc.observation.time, "user", 0.9, "x")
+    seen = []
+    monkeypatch.setattr(llm, "call", lambda p, **k: seen.append(k["max_tokens"]) or {"text": "t", "condition": "c"})
+    actions.revise_text(sc.memories[1], d, sc.observation)
+    actions.condition_text(sc.memories[1], d, sc.observation)
+    assert seen == [CFG["rewrite_max_tokens"]] * 2

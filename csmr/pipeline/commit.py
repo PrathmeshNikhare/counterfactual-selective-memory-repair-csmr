@@ -43,7 +43,7 @@ def validate(store: MemoryStoreAdapter, probes: list[str], delta: StateChange, o
     """Re-run the probes on the committed store; warn if benefit differs from the selection-time estimate."""
     cfg = cfg or load_config()
     mems = [r for m in store.all() if (r := render(m))]  # same rendering as overlay.view()
-    scores = [judge(answer(q, mems), q, delta, obs, cfg)["score"] for q in probes]
+    scores = [judge(answer(q, mems, cfg=cfg), q, delta, obs, cfg)["score"] for q in probes]
     benefit = sum(scores) / len(scores) if scores else 0.0
     ok = abs(benefit - expected_benefit) <= cfg["validation_tol"]
     if not ok:
