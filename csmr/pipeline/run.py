@@ -31,7 +31,8 @@ def run_pipeline(obs: Observation, store: MemoryStoreAdapter, cfg: dict | None =
         return trace
 
     # A
-    delta = extract_state_change(obs, [m.attribute for m in store.all()], cfg)
+    related = [m.text for m in store.search(obs.text, cfg["extract_context_k"])]
+    delta = extract_state_change(obs, [m.attribute for m in store.all()], cfg, related=related)
     if delta is None:
         return finish()
     trace.delta = asdict(delta)

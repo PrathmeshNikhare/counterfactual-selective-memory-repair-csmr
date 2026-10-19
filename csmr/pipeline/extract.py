@@ -15,7 +15,13 @@ Observation: "{text}"
 Attribute keys already used in memory: {known}
 Reuse one of those keys if it fits; otherwise invent a short snake_case key (e.g. vehicle_ownership, employment, residence).
 
+Stored memories most similar to the observation:
+{related}
+
 Return JSON only.
+If the observation only repeats or confirms what the stored memories above already say, nothing changed:
+return {{"state_change": null}}. Example: memory "The user goes to yoga every Sunday." and observation
+"I still go to yoga every Sunday." -> {{"state_change": null}}.
 Tentative, planned or hedged changes ("might", "planning to", "not sure") MUST still be extracted, with a lower
 confidence; judging how weak the evidence is is not your job. Return null only if the message changes no stored
 fact at all, i.e. nothing stored becomes false or outdated (a new preference, a plain fact with nothing to
@@ -32,9 +38,12 @@ change_type:
   (I switched my bank account to HDFC, My favourite team is now Mumbai Indians)"""
 
 
-def extract_state_change(obs: Observation, known_attributes: list[str], cfg: dict | None = None) -> StateChange | None:
-    """Paper IV-A: Δ = (entity, attribute, old, new, time, source, confidence). One LLM call."""
-    prompt = EXTRACT_PROMPT.format(text=obs.text, known=sorted(set(known_attributes)) or "none")
+def extract_state_change(obs: Observation, known_attributes: list[str], cfg: dict | None = None, *,
+                         related: list[str] | None = None) -> StateChange | None:
+    """Paper IV-A: Δ = (entity, attribute, old, new, time, source, confidence). One LLM call.
+    `related` = texts of the stored memories closest to the observation, so a confirmation can be told from a change."""
+    prompt = EXTRACT_PROMPT.format(text=obs.text, known=sorted(set(known_attributes)) or "none",
+                                   related="\n".join(f"- {t}" for t in related or []) or "(none)")
     cfg = cfg or load_config()
     out = llm.try_json(prompt, max_tokens=cfg["extract_max_tokens"], cfg=cfg)
     if out is None or "state_change" not in out:

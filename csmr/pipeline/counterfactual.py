@@ -88,7 +88,7 @@ def judge(ans: str, question: str, delta: StateChange, obs: Observation, cfg: di
     Unknown-like answers get their verdict from determined_by_change in code, not from the LLM.
     A malformed response is retried once; if still malformed the verdict is "vague" (determined_by_change None)."""
     unknown = _unknown_like(ans, cfg)
-    prompt = JUDGE_PROMPT.format(time=obs.time, obs=obs.text, statement=delta.statement or obs.text,
+    prompt = JUDGE_PROMPT.format(time=obs.time[:10], obs=obs.text, statement=delta.statement or obs.text,
                                  question=question, answer=ans)
     for p in (prompt, prompt + RETRY_NUDGE):
         out = llm.try_json(p, model=cfg["llm"]["judge_model"], max_tokens=cfg["judge_max_tokens"], cfg=cfg)

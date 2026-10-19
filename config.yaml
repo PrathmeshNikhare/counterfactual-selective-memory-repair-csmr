@@ -7,7 +7,9 @@ llm:
   judge_model: null                     # null = same as model
   temperature: 0
   max_retries: 4
-  backoff_base_s: 1     # rate-limit sleep = backoff_base_s * 2**attempt
+  backoff_base_s: 1     # rate-limit sleep = backoff_base_s * 2**attempt, unless the provider sends Retry-After
+  max_retry_wait_s: 300 # cap on a Retry-After wait
+  quota_patterns: ["per day", "\\bTPD\\b", "\\bRPD\\b", "daily"]  # rate-limit text meaning the daily quota is gone
   max_tokens: 512       # default when a caller passes none
   cache_dir: ".cache/llm"
 
@@ -17,6 +19,7 @@ models:
 
 # Phase A
 extract_max_tokens: 2048   # reasoning model can exhaust 512 before emitting JSON
+extract_context_k: 5       # stored memories shown to extraction so it can tell confirmation from change
 root_nli_threshold: 0.8
 
 # Phase B

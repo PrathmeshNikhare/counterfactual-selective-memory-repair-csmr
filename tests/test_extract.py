@@ -87,3 +87,29 @@ def test_explicit_null_state_change_is_not_a_fallback(monkeypatch):
     monkeypatch.setattr(llm, "call", lambda p, **k: {"state_change": None})
     assert extract_state_change(Observation("I like tea", "user", ""), []) is None
     assert llm.stats()["fallbacks"] == {}
+
+
+def test_prompt_carries_related_memories_and_confirmation_rule(monkeypatch):
+    seen = []
+    monkeypatch.setattr(llm, "call", lambda p, **k: seen.append(p) or {"state_change": None})
+    obs = Observation("I own a car and drive to work every day", "user", "2026-06-02T09:00:00")
+    assert extract_state_change(obs, ["vehicle_ownership"], related=["The user owns a car.", "The user drives to work."]) is None
+    assert "- The user owns a car.\n- The user drives to work." in seen[0]
+    assert "repeats or confirms" in seen[0] and "yoga every Sunday" in seen[0]
+    extract_state_change(obs, [])
+    assert "(none)" in seen[1]
+
+
+def test_action_and_judge_prompts_carry_date_only(monkeypatch):
+    from csmr.config import load_config
+    from csmr.pipeline import counterfactual as cf
+    from csmr.pipeline.actions import revise_text
+    from csmr.types import Memory
+    seen = []
+    monkeypatch.setattr(llm, "call", lambda p, **k: seen.append(p) or {"text": "t", "determined_by_change": True,
+                                                                       "verdict": "consistent"})
+    obs = Observation("I sold my car.", "user", "2026-06-02T09:41:07")
+    d = StateChange("user", "vehicle_ownership", None, "no car", obs.time, "user", 0.9, "The user sold their car.")
+    revise_text(Memory("M1", "The user owns a car.", "user", "vehicle_ownership", "2026-03-01"), d, obs)
+    cf.judge("The user has no car.", "Does the user own a car?", d, obs, load_config())
+    assert len(seen) == 2 and all("2026-06-02" in p and "09:41" not in p and "T09" not in p for p in seen)

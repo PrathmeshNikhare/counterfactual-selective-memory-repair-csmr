@@ -3,6 +3,7 @@ import argparse
 import json
 from pathlib import Path
 
+from csmr import llm
 from csmr.adapters.memory import InMemoryAdapter
 from csmr.config import load_config
 from csmr.pipeline.run import run_pipeline
@@ -43,4 +44,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except llm.QuotaExhausted as e:
+        raise SystemExit(str(e))

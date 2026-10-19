@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import time
 
 import diskcache
@@ -44,6 +45,21 @@ def _get_cache(cfg: dict) -> diskcache.Cache:
     return _cache
 
 
+class QuotaExhausted(RuntimeError):
+    """The provider's daily token/request quota is gone; retrying now is pointless."""
+
+
+QUOTA_MSG = "Daily LLM quota exhausted - resume later; cached calls are kept"
+
+
+def _retry_wait(e: Exception, attempt: int, cfg: dict) -> float:
+    """Provider's Retry-After (seconds), capped at max_retry_wait_s; else exponential backoff."""
+    try:
+        return min(float(e.response.headers["retry-after"]), cfg["max_retry_wait_s"])
+    except (AttributeError, KeyError, TypeError, ValueError):  # no/odd header (e.g. an HTTP date)
+        return cfg["backoff_base_s"] * 2**attempt
+
+
 def _complete(model: str, system: str | None, prompt: str, json_mode: bool, max_tokens: int, cfg: dict) -> str:
     """The only function that touches the API (tests stub this)."""
     global _client
@@ -62,9 +78,13 @@ def _complete(model: str, system: str | None, prompt: str, json_mode: bool, max_
             )
             return r.choices[0].message.content or ""
         except Exception as e:  # openai.RateLimitError et al.; only back off on rate limits
-            if type(e).__name__ != "RateLimitError" or attempt == cfg["max_retries"]:
+            if type(e).__name__ != "RateLimitError":
                 raise
-            time.sleep(cfg["backoff_base_s"] * 2**attempt)
+            if any(re.search(p, str(e), re.I) for p in cfg["quota_patterns"]):
+                raise QuotaExhausted(QUOTA_MSG) from e
+            if attempt == cfg["max_retries"]:
+                raise
+            time.sleep(_retry_wait(e, attempt, cfg))
 
 
 def _json_mode_error(e: Exception) -> bool:

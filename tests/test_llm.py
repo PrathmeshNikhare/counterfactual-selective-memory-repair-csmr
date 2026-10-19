@@ -84,3 +84,38 @@ def test_defaults_come_from_config(fake, monkeypatch):
     monkeypatch.setattr(llm, "_complete", lambda m, s, p, j, mt, cfg: got.append(mt) or "x")
     llm.call("p")
     assert got == [load_config()["llm"]["max_tokens"]]
+
+
+class RateLimitError(Exception):  # matched by class name, like the real openai one
+    def __init__(self, msg, retry_after=None):
+        super().__init__(msg)
+        self.response = type("R", (), {"headers": {"retry-after": retry_after} if retry_after else {}})()
+
+
+def _client(errors):
+    """Fake OpenAI client that raises `errors` in order, then answers 'ok'."""
+    def create(**kw):
+        if errors:
+            raise errors.pop(0)
+        return type("R", (), {"choices": [type("C", (), {"message": type("M", (), {"content": "ok"})()})()]})()
+    return type("C", (), {"chat": type("H", (), {"completions": type("P", (), {"create": staticmethod(create)})()})()})()
+
+
+def test_retry_after_is_honoured_and_capped(monkeypatch):
+    from csmr.config import load_config
+    cfg = load_config()
+    sleeps = []
+    monkeypatch.setattr(llm.time, "sleep", sleeps.append)
+    monkeypatch.setattr(llm, "_client", _client([RateLimitError("slow down", "7.5"), RateLimitError("slow down", "99999"),
+                                                RateLimitError("slow down")]))
+    assert llm._complete("m", None, "p", False, 8, cfg) == "ok"
+    assert sleeps == [7.5, cfg["llm"]["max_retry_wait_s"], cfg["llm"]["backoff_base_s"] * 2**2]
+
+
+def test_daily_quota_raises_clear_error_without_retrying(monkeypatch):
+    from csmr.config import load_config
+    errs = [RateLimitError("Rate limit reached ... on tokens per day (TPD): Limit 200000, Used 199578", "239")]
+    monkeypatch.setattr(llm.time, "sleep", lambda s: pytest.fail("must not wait on a daily quota"))
+    monkeypatch.setattr(llm, "_client", _client(errs))
+    with pytest.raises(llm.QuotaExhausted, match="Daily LLM quota exhausted - resume later; cached calls are kept"):
+        llm._complete("m", None, "p", False, 8, load_config())

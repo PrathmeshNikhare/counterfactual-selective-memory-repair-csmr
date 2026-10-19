@@ -14,7 +14,7 @@ Integration fixture for everything: `data/dev/car_sale.json`.
 - [x] **A3 `csmr/models.py`** — `embed`, `nli`, `nli_batch`. *Accept:* probs sum to ~1; nli("The user owns a car.", "The user does not own a car.").contradiction > 0.5; nli("The user owns a car.", "The user has a vehicle.") entailment > contradiction. (First-person "I sold my car." premise is xfail: Phase A feeds `delta.statement`.)
 - [x] **A4 `csmr/adapters/memory.py`** + `csmr/scenario.py`. *Accept:* load car_sale.json; `update()` bumps version and keeps history; pipeline-facing objects contain no gold fields.
 - [x] **A5 `pipeline/run.py` + `run.py` CLI** — chains phases (stubs OK initially), writes trace JSON. *Accept:* `python run.py data/dev/car_sale.json` prints a trace.
-- [ ] **A6 `csmr/api.py`** + `examples/chat_agent.py` (terminal loop: observe → retrieve → answer). *Accept:* typing "I sold my car" then "how do I get to work?" gives a non-car answer.
+- [x] **A6 `csmr/api.py`** + `examples/chat_agent.py` (terminal loop: observe → retrieve → answer). *Accept:* typing "I sold my car" then "how do I get to work?" gives a non-car answer.
 
 ## Lane B — Phases A & B
 - [x] **B1 `pipeline/extract.py`** — `extract_state_change`, `find_roots`. *Accept:* car → entity user, attribute ~vehicle_ownership, roots == ["M1"]; "I like pizza" with no conflict → None or no roots.

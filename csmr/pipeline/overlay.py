@@ -7,10 +7,15 @@ from csmr.adapters.base import MemoryStoreAdapter
 from csmr.types import Action, Memory, Observation, RepairSet, StateChange
 
 
-def observation_memory(delta: StateChange, obs: Observation, store: MemoryStoreAdapter) -> Memory:
-    """The new observation as a memory (Spec 8): appended to every view and to the committed store."""
-    return Memory(id=f"OBS{len(store.all(include_revoked=True)) + 1}", text=delta.statement or obs.text,
-                  entity=delta.entity, attribute=delta.attribute, time=obs.time, source=obs.source)
+NOTE_ENTITY, NOTE_ATTRIBUTE = "user", "general"  # unclassified observation (no state change extracted)
+
+
+def observation_memory(delta: StateChange | None, obs: Observation, store: MemoryStoreAdapter) -> Memory:
+    """The new observation as a memory (Spec 8): appended to every view and to the committed store.
+    With no delta it is stored verbatim under a generic entity/attribute (Spec 12)."""
+    return Memory(id=f"OBS{len(store.all(include_revoked=True)) + 1}", text=delta.statement or obs.text if delta else obs.text,
+                  entity=delta.entity if delta else NOTE_ENTITY, attribute=delta.attribute if delta else NOTE_ATTRIBUTE,
+                  time=obs.time, source=obs.source)
 
 
 def render(m: Memory) -> Memory | None:

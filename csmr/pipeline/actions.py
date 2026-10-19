@@ -44,7 +44,7 @@ def _ask(prompt: str, key: str, mem: Memory, delta: StateChange, obs: Observatio
     """Rewrite text for mem, or None (after one retry) if the response is malformed."""
     cfg = cfg or load_config()
     out = llm.try_json_valid(
-        prompt.format(memory=mem.text, time=obs.time, obs=obs.text, statement=delta.statement or obs.text),
+        prompt.format(memory=mem.text, time=obs.time[:10], obs=obs.text, statement=delta.statement or obs.text),
         lambda o: bool(str(o.get(key) or "").strip()), max_tokens=cfg["rewrite_max_tokens"],
         cfg=cfg)
     return str(out[key]).strip() if out else None

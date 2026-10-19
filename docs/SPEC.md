@@ -49,6 +49,7 @@ def find_roots(delta: StateChange, obs: Observation, store) -> list[str]
   Tentative / planned / hedged changes ("might", "planning to") are still extracted, with lower confidence; `null` only when the message changes no stored fact. Weak evidence is judged in Phase C, not here.
   Attribute should be a short snake_case key (e.g. `vehicle_ownership`, `employment`, `residence`).
   The prompt receives `known_attributes` (attribute keys already in the store) and must reuse one when it fits.
+  It also receives `related` = texts of the `cfg.extract_context_k` stored memories closest to the observation (the attribute is not known before extraction), and must return `null` when the observation only repeats or confirms them (few-shot from an unrelated domain: yoga).
 - `time`, `source` copied from the observation.
 - Roots = memories with `m.entity == delta.entity` and `m.attribute == delta.attribute`.
   Only if that set is empty, fall back to memories with
@@ -125,7 +126,7 @@ elif P >= τd and info.temporary:                   CONDITIONAL
 elif P >= τd:                                      VERIFY
 else:                                              KEEP
 ```
-REVISE text must preserve history-compatible meaning, e.g. "The user previously drove to work by car; current commute mode unknown after selling the car (as of {time})."
+REVISE text must preserve history-compatible meaning, e.g. "The user previously drove to work by car; current commute mode unknown after selling the car (as of {date})." Prompts (REVISE, CONDITIONAL, judge) receive the observation date `obs.time[:10]` only, never the time of day, so identical input on the same day hits the LLM cache.
 
 ## 7. Phase D — Repair sets (`pipeline/repair_sets.py`) — Paper IV-D
 
@@ -211,6 +212,9 @@ class CSMR:
     def retrieve(self, query, k=5) -> list[str]     # excludes revoked, tags unverified/conditional
     def pending_verifications(self) -> list[Memory]
 ```
+`observe()` semantics: a text ending in `?` is a question — nothing is run or stored (empty trace). Otherwise `run_pipeline` runs; repair happens only if a state change is extracted (Phase E then also stores the observation memory). If no state change is extracted, `observe()` still stores the text verbatim as a new memory (`observation_memory(None, ...)`: id `OBS<n>`, entity `user`, attribute `general`) and records an `ADD` transition in the trace; no existing memory is touched. `run_pipeline` itself never stores when Δ is None (baselines/eval rely on that).
+LLM errors: a rate limit honours `Retry-After` (capped at `llm.max_retry_wait_s`); if the error text matches `llm.quota_patterns` (daily quota) `llm.QuotaExhausted` is raised ("Daily LLM quota exhausted - resume later; cached calls are kept") instead of retrying.
+
 Trace JSON contains: Δ, roots, candidates with all features, P_dep, S, proposed actions, every repair set with score breakdown + feasibility, chosen set, version transitions, LLM call stats, wall time.
 
 Ablation flags (`config.yaml: ablation`):
