@@ -29,7 +29,7 @@ Integration fixture for everything: `data/dev/car_sale.json`.
 
 ## Lane D — Phases D & E
 - [x] **D1 `pipeline/repair_sets.py`** — R0..R4, dedup, feasibility. *Accept:* unit test with synthetic CandidateInfo: R4 infeasible when a member has S < τe.
-- [ ] **D2 `pipeline/overlay.py`** + `pipeline/agent.py`. *Accept:* view never mutates store (test with deep-equality before/after).
+- [x] **D2 `pipeline/overlay.py`** + `pipeline/agent.py`. *Accept:* view never mutates store (test with deep-equality before/after).
 - [ ] **D3 `pipeline/counterfactual.py`** — probes, judge, objective, select, answer cache. *Accept:* car → chosen set equals R2 (M1 changed, M2 REVISE, M3 VERIFY allowed, M4/M5 KEEP); score breakdown in trace.
 - [ ] **D4 `pipeline/commit.py`** — versioned commit, pending-verify queue, validation. *Accept:* after commit M1.version == 2 and M1.history has the original text.
 - [ ] **D5** run `method-auditor` on D1–D4 — especially the no-leakage check.
