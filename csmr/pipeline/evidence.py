@@ -15,7 +15,6 @@ from csmr.types import CandidateInfo, Memory, Observation, StateChange
 FEATURES = ["source_reliability", "directness", "contradiction_strength", "not_hedged", "not_temporary",
             "corroboration", "extraction_conf", "freshness"]
 _MODEL_FILE = ROOT / "models" / "evidence.json"
-_DIRECTNESS = {0: 1.0, 1: 0.6}
 
 
 def _weights() -> dict[str, float]:
@@ -36,12 +35,12 @@ def evidence_features(cand: Memory, delta: StateChange, obs: Observation, info: 
     info.hedged = _matches(cfg["hedge_patterns"], obs.text)
     info.temporary = _matches(cfg["temporary_patterns"], obs.text)
     return {
-        "source_reliability": cfg["source_reliability"].get(delta.source, 0.0),
-        "directness": _DIRECTNESS.get(info.hop, 0.3),
+        "source_reliability": cfg["source_reliability"].get(delta.source, cfg["source_reliability_default"]),
+        "directness": cfg["directness"].get(info.hop, cfg["hop_default"]),
         "contradiction_strength": models.nli(delta.statement or delta.as_sentence(), cand.text)["contradiction"],
         "not_hedged": float(not info.hedged),
         "not_temporary": float(not info.temporary),
-        "corroboration": min(corroboration, 3) / 3,
+        "corroboration": min(corroboration, cfg["corroboration_cap"]) / cfg["corroboration_cap"],
         "extraction_conf": delta.confidence,
         "freshness": 1.0 if obs.time >= cand.time else 0.5,
     }

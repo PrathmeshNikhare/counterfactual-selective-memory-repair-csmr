@@ -31,6 +31,7 @@ def _weights() -> dict[str, float]:
 def dependency_features(root: Memory, cand: Memory, delta: StateChange, obs: Observation,
                         info: CandidateInfo) -> dict[str, float]:
     """Paper IV-C feature vector z for the pair (root, cand); all values in [0, 1]."""
+    cfg = load_config()
     a, b = models.embed([root.text, cand.text])
     cue = llm.call(CAUSAL_PROMPT.format(a=root.text, b=cand.text), json_mode=True)
     cue = cue.get("answer", "") if isinstance(cue, dict) else cue
@@ -43,7 +44,7 @@ def dependency_features(root: Memory, cand: Memory, delta: StateChange, obs: Obs
         "temporal_after": float(cand.time > root.time),
         "same_source": float(root.source == cand.source),
         "causal_cue": float(str(cue).strip().lower().startswith("y")),
-        "hop_closeness": {0: 1.0, 1: 0.6}.get(info.hop, 0.3),
+        "hop_closeness": cfg["hop_closeness"].get(info.hop, cfg["hop_default"]),
     }
 
 
@@ -58,8 +59,9 @@ def assess_dependency(cands: dict[str, CandidateInfo], store: MemoryStoreAdapter
     """Fill dep_features / p_dep on every candidate in place. Roots get 1.0; others max over roots."""
     mems = {m.id: m for m in store.all()}
     roots = [i for i, c in cands.items() if c.is_root]
+    use = load_config()["ablation"]["use_dependency"]
     for mid, info in cands.items():
-        if info.is_root:
+        if info.is_root or not use:  # use_dependency=false: trivial default P = 1, no NLI/LLM calls
             info.p_dep = 1.0
             continue
         best = None

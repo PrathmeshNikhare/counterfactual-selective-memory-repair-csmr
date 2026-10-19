@@ -61,7 +61,7 @@ def find_roots(delta: StateChange, obs: Observation, store) -> list[str]
 ```python
 def build_candidates(delta, obs, roots: list[str], store) -> dict[str, CandidateInfo]
 ```
-1. cosine(obs embedding, memory embeddings) → top `cfg.top_k` (default 10); if `delta.entity` known, restrict to same entity (fallback to all if <K).
+1. cosine(obs embedding, memory embeddings) → top `cfg.top_k` (default 10); if `delta.entity` known, restrict to same entity (fallback to all if <K). Metadata filter (paper IV-B "semantic embeddings and metadata filters for entity, attribute and time"; Section VI "M5 should not enter the candidate set"): a top-K hit is kept only if it has the same entity AND (same attribute as Δ OR cosine ≥ `cfg.topk_min_sim`). Needed because with small stores top-K alone returns every memory.
 2. Hop expansion from roots: hop-1 = memories sharing entity AND (attribute OR cosine ≥ `cfg.hop_sim` (0.35)) with any root; hop-2 = same from hop-1, up to `cfg.max_hops` (2).
 3. Union with roots. Record per candidate: `hop` (0 for roots, 1, 2, or `None` if only from top-K → treat as 2), `retrieved_by` ("root" | "topk" | "hop").
 - Permissive by design: entering C ≠ repair.

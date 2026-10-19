@@ -21,6 +21,7 @@ root_nli_threshold: 0.8
 top_k: 10
 max_hops: 2
 hop_sim: 0.35
+topk_min_sim: 0.35   # top-K metadata filter: same entity AND (same attribute OR cosine >= this)
 
 # Phase C thresholds
 tau_d: 0.5          # dependency threshold
@@ -56,6 +57,14 @@ source_reliability:
   tool: 0.8
   third_party: 0.5
   inferred: 0.3
+
+source_reliability_default: 0.0   # unknown source
+
+# hop -> value (SPEC §4/§5); hops not listed (e.g. top-K-only) use hop_default
+hop_closeness: {0: 1.0, 1: 0.6, 2: 0.3}
+directness: {0: 1.0, 1: 0.6, 2: 0.3}
+hop_default: 0.3
+corroboration_cap: 3
 
 hedge_patterns: ["\\bmight\\b", "\\bmaybe\\b", "thinking of", "planning to", "not sure", "\\bprobably\\b", "considering"]
 temporary_patterns: ["this week", "for now", "temporarily", "\\buntil\\b", "for a few days", "for a week", "at the moment"]

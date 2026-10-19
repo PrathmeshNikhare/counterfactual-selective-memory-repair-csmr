@@ -34,10 +34,10 @@ def build_candidates(delta: StateChange, obs: Observation, roots: list[str],
     for i in sorted(pool, key=lambda i: -cos(q, vecs[i]))[:cfg["top_k"]]:
         m = mems[i]
         # attribute/similarity filter: same entity and (same attribute as Δ or similar enough to the observation)
-        if i not in cands and m.entity == delta.entity and (m.attribute == delta.attribute or cos(q, vecs[i]) >= cfg["hop_sim"]):
+        if i not in cands and m.entity == delta.entity and (m.attribute == delta.attribute or cos(q, vecs[i]) >= cfg["topk_min_sim"]):
             cands[i] = CandidateInfo(i, 2, "topk")
 
-    frontier = list(cands)
+    frontier = [i for i, c in cands.items() if c.is_root]  # hops expand from roots only (SPEC §3)
     for hop in range(1, cfg["max_hops"] + 1):
         new = [i for i in ids if i not in cands and any(related(mems[i], a) for a in frontier)]
         for i in new:
