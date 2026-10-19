@@ -42,11 +42,11 @@ dependency_weights:
   hop_closeness: 1.0
 
 evidence_weights:
-  intercept: -7.0
+  intercept: -7.5
   source_reliability: 1.5
   directness: 1.5
   contradiction_strength: 3.0
-  not_hedged: 2.0
+  not_hedged: 3.0
   not_temporary: 1.5
   corroboration: 0.5
   extraction_conf: 1.0
