@@ -53,6 +53,7 @@ class StateChange:
     time: str
     source: str
     confidence: float
+    statement: str = ""  # third-person restatement of the observation, e.g. "The user sold their car."
 
     def as_sentence(self) -> str:
         return f"The {self.entity}'s {self.attribute.replace('_', ' ')} is now {self.new}."

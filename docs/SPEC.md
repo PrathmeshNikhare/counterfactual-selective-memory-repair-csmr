@@ -41,14 +41,15 @@ Lazy singletons:
 ## 2. Phase A — State-change extraction (`pipeline/extract.py`) — Paper IV-A
 
 ```python
-def extract_state_change(obs: Observation) -> StateChange | None
+def extract_state_change(obs: Observation, known_attributes: list[str]) -> StateChange | None
 def find_roots(delta: StateChange, obs: Observation, store) -> list[str]
 ```
-- One LLM call, JSON mode. Prompt asks for `entity, attribute, old, new, confidence`, or `{"state_change": null}`.
+- One LLM call, JSON mode. Prompt asks for `entity, attribute, old, new, confidence, statement` (`statement` = third-person restatement of the observation, e.g. "The user sold their car."), or `{"state_change": null}`.
   Attribute should be a short snake_case key (e.g. `vehicle_ownership`, `employment`, `residence`).
+  The prompt receives `known_attributes` (attribute keys already in the store) and must reuse one when it fits.
 - `time`, `source` copied from the observation.
 - Roots = memories where (`m.entity == delta.entity` and `m.attribute == delta.attribute`)
-  OR `nli(obs.text, m.text).contradiction >= cfg.root_nli_threshold` (default 0.8).
+  OR `nli(delta.statement, m.text).contradiction >= cfg.root_nli_threshold` (default 0.8).
 - No store modification. If `None` → pipeline returns early with empty trace (cheap gating).
 
 ## 3. Phase B — Candidate construction (`pipeline/candidates.py`) — Paper IV-B
@@ -95,7 +96,7 @@ def fit_evidence(X, y) -> None
 |---|---|
 | `source_reliability` | lookup in config: user 0.9, tool 0.8, third_party 0.5, inferred 0.3 |
 | `directness` | 1.0 root, 0.6 hop1, 0.3 hop2 |
-| `contradiction_strength` | nli(obs.text, cand.text).contradiction |
+| `contradiction_strength` | nli(delta.statement, cand.text).contradiction |
 | `not_hedged` | 1 − hedge flag (regex list in config: might, maybe, thinking of, planning to, not sure, probably) |
 | `not_temporary` | 1 − temporary flag (regex: this week, for now, temporarily, until, for a few days) |
 | `corroboration` | min(count of supporting observations, 3)/3 |
