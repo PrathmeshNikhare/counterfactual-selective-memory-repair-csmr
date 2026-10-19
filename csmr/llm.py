@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import time
 
@@ -12,18 +13,27 @@ from dotenv import load_dotenv
 from csmr.config import ROOT, load_config
 
 _stats = {"calls": 0, "hits": 0, "misses": 0}
+_fallbacks: dict[str, int] = {}  # malformed-LLM-output fallbacks by kind, reported in the trace
+log = logging.getLogger(__name__)
 _cache: diskcache.Cache | None = None
 _client = None
 _JSON_NUDGE = "Return valid JSON only."
 
 
 def stats() -> dict:
-    return dict(_stats)
+    return {**_stats, "fallbacks": dict(_fallbacks)}
 
 
 def reset_stats() -> None:
     for k in _stats:
         _stats[k] = 0
+    _fallbacks.clear()
+
+
+def fallback(kind: str, detail: str = "") -> None:
+    """Record that a malformed LLM response was replaced by a safe default (counted in Trace.llm_stats)."""
+    _fallbacks[kind] = _fallbacks.get(kind, 0) + 1
+    log.warning("LLM fallback [%s] %s", kind, detail)
 
 
 def _get_cache() -> diskcache.Cache:
@@ -75,3 +85,12 @@ def call(prompt: str, *, system: str | None = None, json_mode: bool = False,
             out = json.loads(_complete(model, system, f"{prompt}\n\n{_JSON_NUDGE}", json_mode, max_tokens))
     cache[key] = out  # only successes are cached
     return out
+
+
+def try_json(prompt: str, **kw) -> dict | None:
+    """`call(json_mode=True)` that returns None instead of raising on undecodable or non-object JSON."""
+    try:
+        out = call(prompt, json_mode=True, **kw)
+    except json.JSONDecodeError:
+        return None
+    return out if isinstance(out, dict) else None

@@ -10,6 +10,7 @@ import re
 
 from csmr import llm
 from csmr.adapters.base import MemoryStoreAdapter
+from csmr.config import load_config
 from csmr.pipeline.actions import condition_text, revise_text
 from csmr.pipeline.agent import answer
 from csmr.pipeline.overlay import view
@@ -41,6 +42,8 @@ Decide in two steps.
    - "vague" (0.5): determined_by_change is true but the answer is "unknown" or vague.
    - "contradicts" (0.0): the answer asserts something the new fact contradicts.
 Return JSON only: {{"determined_by_change": true | false, "verdict": "consistent" | "vague" | "contradicts"}}"""
+RETRY_NUDGE = "\nReturn exactly the JSON object described above."  # changes the prompt so the disk cache is not hit again
+PROBE_FALLBACK = "Is it still true that {text}?"
 
 VERDICT_SCORE = {"consistent": 1.0, "vague": 0.5, "contradicts": 0.0}
 
@@ -57,11 +60,16 @@ def generate_probes(delta: StateChange, obs: Observation, cands: dict[str, Candi
     """One neutral probe about Delta's attribute, then one per candidate (roots/closest hops first, KEEP included),
     presupposing probes dropped, capped at n."""
     mems = "\n".join(f"- {m}: {store.get(m).text}" for m in cands)
-    out = llm.call(PROBE_PROMPT.format(attribute=delta.attribute.replace("_", " "), memories=mems),
-                   json_mode=True, max_tokens=2048)
-    per_mem = out.get("memory_questions", {})
+    out = llm.try_json(PROBE_PROMPT.format(attribute=delta.attribute.replace("_", " "), memories=mems),
+                       max_tokens=load_config()["probe_max_tokens"])
     order = sorted(cands, key=lambda m: (not cands[m].is_root, cands[m].hop, m))
-    qs = [str(q).strip() for q in [out["change_question"]] + [per_mem[m] for m in order if m in per_mem]]
+    if (out is None or not str(out.get("change_question") or "").strip()
+            or not isinstance(out.get("memory_questions"), dict)):
+        llm.fallback("probes", "malformed response; one template probe per candidate")
+        qs = [PROBE_FALLBACK.format(text=store.get(m).text.rstrip(". ")) for m in order]
+    else:
+        per_mem = out["memory_questions"]
+        qs = [str(out["change_question"]).strip()] + [str(per_mem[m]).strip() for m in order if m in per_mem]
     return [q for q in qs if not _presupposes(q, obs, cands, store)][:n]
 
 
@@ -76,12 +84,21 @@ def _unknown_like(ans: str, cfg: dict) -> bool:
 
 def judge(ans: str, question: str, delta: StateChange, obs: Observation, cfg: dict) -> dict:
     """Two-step judge in one call; returns {"determined_by_change", "verdict", "score"} (Spec 10).
-    Unknown-like answers get their verdict from determined_by_change in code, not from the LLM."""
-    out = llm.call(JUDGE_PROMPT.format(time=obs.time, obs=obs.text, statement=delta.statement or obs.text,
-                                       question=question, answer=ans),
-                   json_mode=True, model=cfg["llm"]["judge_model"], max_tokens=1024)
-    determined = bool(out["determined_by_change"])
-    if _unknown_like(ans, cfg):
+    Unknown-like answers get their verdict from determined_by_change in code, not from the LLM.
+    A malformed response is retried once; if still malformed the verdict is "vague" (determined_by_change None)."""
+    unknown = _unknown_like(ans, cfg)
+    prompt = JUDGE_PROMPT.format(time=obs.time, obs=obs.text, statement=delta.statement or obs.text,
+                                 question=question, answer=ans)
+    for p in (prompt, prompt + RETRY_NUDGE):
+        out = llm.try_json(p, model=cfg["llm"]["judge_model"], max_tokens=cfg["judge_max_tokens"])
+        if out is not None and isinstance(out.get("determined_by_change"), bool) and (
+                unknown or str(out.get("verdict")).strip().lower() in VERDICT_SCORE):
+            break
+    else:
+        llm.fallback("judge", f"malformed response for {question!r}; verdict vague")
+        return {"determined_by_change": None, "verdict": "vague", "score": VERDICT_SCORE["vague"]}
+    determined = out["determined_by_change"]
+    if unknown:
         verdict = "vague" if determined else "consistent"  # set in code; the LLM verdict is only for claims
     else:
         verdict = str(out["verdict"]).strip().lower()
@@ -145,7 +162,8 @@ def select(repair_sets: list[RepairSet], probes: list[str], store: MemoryStoreAd
         for rs in feasible:
             rs.score, details[rs.name] = _evaluate(rs, probes, store, revised, conditions, cands, delta, obs, cfg,
                                                    cache, new_mem)
-        best = max(feasible, key=lambda r: (r.score["total"], -r.score["size"]))
+        top = max(r.score["total"] for r in feasible)  # near-ties (within tie_eps) fall through to smaller |R|
+        best = min((r for r in feasible if r.score["total"] >= top - cfg["tie_eps"]), key=lambda r: r.score["size"])
     else:  # ablation: apply all proposed actions (R3; dedup may have renamed it to a lower-index twin)
         best = [rs for rs in feasible if rs.name <= "R3"][-1]
     rows = [{"name": rs.name, "actions": {k: v.value for k, v in rs.actions.items()}, "feasible": rs.feasible,

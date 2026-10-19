@@ -13,19 +13,30 @@ def observation_memory(delta: StateChange, obs: Observation, store: MemoryStoreA
                   entity=delta.entity, attribute=delta.attribute, time=obs.time, source=obs.source)
 
 
+def render(m: Memory) -> Memory | None:
+    """What the agent sees for a memory, from its status/condition (Spec 8). None if revoked.
+    Shared by view() (virtual repair) and commit.validate() (committed store) so both render identically."""
+    if m.status == "revoked":
+        return None
+    text = m.text
+    if m.status == "pending_verify":
+        text = f"[unverified] {m.text}"
+    elif m.status == "conditional" and m.condition:
+        text = f"{m.text} (only valid if: {m.condition})"
+    return dataclasses.replace(m, text=text)  # copy; history list is shared but never written
+
+
+_ACTION_STATUS = {Action.REVOKE: "revoked", Action.VERIFY: "pending_verify", Action.CONDITIONAL: "conditional"}
+
+
 def view(store: MemoryStoreAdapter, rs: RepairSet, revised: dict[str, str],
          conditions: dict[str, str], new_mem: Memory | None = None) -> list[Memory]:
     out = []
     for m in store.all():
         a = rs.actions.get(m.id, Action.KEEP)
-        if a == Action.REVOKE:
-            continue
-        text = m.text
-        if a == Action.REVISE:
-            text = revised[m.id]
-        elif a == Action.VERIFY:
-            text = f"[unverified] {m.text}"
-        elif a == Action.CONDITIONAL:
-            text = f"{m.text} (only valid if: {conditions[m.id]})"
-        out.append(dataclasses.replace(m, text=text))  # copy; history list is shared but never written
-    return out + [dataclasses.replace(new_mem)] if new_mem else out
+        virtual = dataclasses.replace(
+            m, text=revised[m.id] if a == Action.REVISE else m.text, status=_ACTION_STATUS.get(a, m.status),
+            condition=conditions[m.id] if a == Action.CONDITIONAL else m.condition)
+        if (r := render(virtual)) is not None:
+            out.append(r)
+    return out + [render(new_mem)] if new_mem else out

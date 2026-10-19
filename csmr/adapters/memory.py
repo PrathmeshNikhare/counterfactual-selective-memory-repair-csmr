@@ -37,7 +37,9 @@ class InMemoryAdapter(MemoryStoreAdapter):
         self._m[memory.id] = memory
 
     def update(self, memory_id: str, *, text: Optional[str] = None, status: Optional[str] = None,
-               condition: Optional[str] = None, reason: str = "") -> Memory:
+               condition: Optional[str] = None, clear_condition: bool = False, reason: str = "") -> Memory:
+        if clear_condition and condition is not None:
+            raise ValueError("condition and clear_condition are mutually exclusive")
         m = self._m[memory_id]
         prev = {k: v for k, v in m.to_dict().items() if k != "history"}
         prev["reason"] = reason
@@ -47,7 +49,9 @@ class InMemoryAdapter(MemoryStoreAdapter):
             m.text = text
         if status is not None:
             m.status = status
-        if condition is not None:
+        if clear_condition:
+            m.condition = None
+        elif condition is not None:
             m.condition = condition
         return m
 

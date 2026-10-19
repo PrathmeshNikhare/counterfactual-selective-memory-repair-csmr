@@ -191,3 +191,86 @@ def test_long_claim_with_uncertain_goes_to_llm(monkeypatch):
     assert cf.judge(long_claim, "q", DELTA, sc.observation, CFG)["verdict"] == "contradicts"
     long_unknown = "Unknown, since " + "the memories say nothing about it " * 3
     assert cf.judge(long_unknown, "q", DELTA, sc.observation, CFG)["verdict"] == "vague"
+
+
+def test_malformed_probes_fall_back_to_templates(monkeypatch):
+    sc = load_scenario("data/dev/car_sale.json")
+    cands = {"M1": _c("M1", 0, 1, 1, True), "M2": _c("M2", 1, .9, .9)}
+    store = InMemoryAdapter(sc.memories)
+    llm.reset_stats()
+    for bad in ({}, {"change_question": ""}, {"change_question": "q?", "memory_questions": "oops"}):
+        monkeypatch.setattr(llm, "call", lambda p, **k: bad)
+        qs = cf.generate_probes(DELTA, sc.observation, cands, store, 6)
+        assert qs == [f"Is it still true that {store.get(m).text.rstrip('. ')}?" for m in ("M1", "M2")]
+    assert llm.stats()["fallbacks"] == {"probes": 3}
+
+
+def test_probe_missing_memory_question_not_a_fallback(monkeypatch):
+    sc = load_scenario("data/dev/car_sale.json")
+    monkeypatch.setattr(llm, "call", lambda p, **k: {"change_question": "D?", "memory_questions": {}})
+    llm.reset_stats()
+    assert cf.generate_probes(DELTA, sc.observation, {"M1": _c("M1", 0, 1, 1, True)},
+                              InMemoryAdapter(sc.memories), 6) == ["D?"]
+    assert llm.stats()["fallbacks"] == {}
+
+
+def test_judge_retries_once_with_changed_prompt(monkeypatch):
+    sc = load_scenario("data/dev/car_sale.json")
+    prompts = []
+
+    def stub(p, **k):
+        prompts.append(p)
+        return {"verdict": "nonsense"} if len(prompts) == 1 else {"determined_by_change": True, "verdict": "contradicts"}
+
+    llm.reset_stats()
+    monkeypatch.setattr(llm, "call", stub)
+    out = cf.judge("Yes, the user owns a car.", "q", DELTA, sc.observation, CFG)
+    assert out["score"] == 0.0 and len(prompts) == 2 and prompts[0] != prompts[1]
+    assert llm.stats()["fallbacks"] == {}
+
+
+@pytest.mark.parametrize("ans", ["Yes, the user owns a car.", "unknown"])
+def test_judge_still_malformed_is_vague_and_counted(monkeypatch, ans):
+    sc = load_scenario("data/dev/car_sale.json")
+    llm.reset_stats()
+    monkeypatch.setattr(llm, "call", lambda p, **k: {"determined_by_change": "maybe"})
+    assert cf.judge(ans, "q", DELTA, sc.observation, CFG) == {
+        "determined_by_change": None, "verdict": "vague", "score": 0.5}
+    assert llm.stats()["fallbacks"] == {"judge": 1}
+
+
+def test_judge_undecodable_json_is_vague(monkeypatch):
+    import json
+    sc = load_scenario("data/dev/car_sale.json")
+
+    def boom(p, **k):
+        raise json.JSONDecodeError("bad", "", 0)
+
+    llm.reset_stats()
+    monkeypatch.setattr(llm, "call", boom)
+    assert cf.judge("Yes.", "q", DELTA, sc.observation, CFG)["score"] == 0.5
+    assert llm.stats()["fallbacks"] == {"judge": 1}
+
+
+def test_max_tokens_come_from_config(monkeypatch):
+    sc = load_scenario("data/dev/car_sale.json")
+    seen = []
+    monkeypatch.setattr(llm, "call", lambda p, **k: seen.append(k["max_tokens"]) or {
+        "change_question": "q?", "memory_questions": {}, "determined_by_change": False, "verdict": "consistent"})
+    cf.generate_probes(DELTA, sc.observation, {"M1": _c("M1", 0, 1, 1, True)}, InMemoryAdapter(sc.memories), 6)
+    cf.judge("Yes.", "q", DELTA, sc.observation, CFG)
+    assert seen == [CFG["probe_max_tokens"], CFG["judge_max_tokens"]]
+
+
+def test_near_ties_prefer_smaller_set(monkeypatch):
+    store, cands, sets, revised, probes, obs = _setup(monkeypatch)
+    big = next(r for r in sets if r.name == "R2")
+    small = next(r for r in sets if r.name == "R1")
+    totals = {"R1": 0.5, "R2": 0.5 + CFG["tie_eps"] / 2}  # R2 higher by float noise only
+
+    def fake_eval(rs, *a, **k):
+        return {"benefit": 0, "collateral": 0, "evidence_cost": 0, "size": rs.size(), "total": totals.get(rs.name, 0.0)}, []
+
+    monkeypatch.setattr(cf, "_evaluate", fake_eval)
+    best, _ = cf.select([small, big], probes, store, revised, {}, cands, DELTA, obs, CFG)
+    assert best.name == "R1"

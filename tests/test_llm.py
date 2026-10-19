@@ -25,7 +25,7 @@ def test_cache_hit_after_miss(fake):
     replies.append("hello")
     assert llm.call("hi") == llm.call("hi") == "hello"
     assert len(seen) == 1
-    assert llm.stats() == {"calls": 2, "hits": 1, "misses": 1}
+    assert llm.stats() == {"calls": 2, "hits": 1, "misses": 1, "fallbacks": {}}
 
 
 def test_bad_json_retried_once(fake):

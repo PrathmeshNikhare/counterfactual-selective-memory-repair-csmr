@@ -1,3 +1,4 @@
+import pytest
 import dataclasses
 
 from csmr.adapters.memory import InMemoryAdapter
@@ -43,3 +44,14 @@ def test_snapshot_independent_and_json_roundtrip(tmp_path):
 def test_search_ranks_relevant_first():
     store = InMemoryAdapter(load_scenario(PATH).memories)
     assert store.search("Italian cuisine", 1)[0].id == "M5"
+
+
+def test_update_clear_condition_and_exclusive_args():
+    from csmr.adapters.memory import InMemoryAdapter
+    from csmr.types import Memory
+    store = InMemoryAdapter([Memory("M", "t", "user", "a", "2025-01-01")])
+    store.update("M", status="conditional", condition="c")
+    m = store.update("M", status="active", clear_condition=True)
+    assert m.condition is None and m.version == 3 and m.history[-1]["condition"] == "c"
+    with pytest.raises(ValueError):
+        store.update("M", condition="x", clear_condition=True)

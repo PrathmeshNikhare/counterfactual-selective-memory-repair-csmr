@@ -155,7 +155,7 @@ Per memory: REVOKE → excluded; REVISE → text replaced; VERIFY → text prefi
 ```python
 def answer(question: str, memories: list[Memory], k: int = 5) -> str
 ```
-Retrieve top-k by cosine to the question from the given memory list; LLM answers using ONLY those memories; must say "unknown" if not determinable. An empty LLM answer is retried once (changed prompt, double max tokens), then replaced by "unknown"; an empty answer never reaches the judge. Same agent is used by all baselines and by eval.
+Retrieve top-k by cosine to the question from the given memory list; LLM answers using ONLY those memories; must say "unknown" if not determinable. An empty LLM answer is retried once (changed prompt, double max tokens), then replaced by "unknown"; an empty answer never reaches the judge. Memories rendered with an `[unverified]` prefix (VERIFY) are flagged in the prompt ("Memories marked [unverified] may be outdated; mention the uncertainty."), so the agent surfaces the uncertainty instead of asserting the stale fact. Same agent is used by all baselines and by eval.
 
 ## 10. Counterfactual selection (`pipeline/counterfactual.py`) — Paper IV-D, V
 
@@ -185,17 +185,20 @@ EvidenceCost  = (#VERIFY actions in rs) * cfg.verify_cost + llm_calls_for_rs * c
 ```
 - argmax over feasible sets; ties → smaller |R|.
 - Cache answers by (question, hash of view) — identical views reuse results.
+- Malformed LLM JSON never crashes a run; each fallback is counted in `Trace.llm_stats["fallbacks"]` (`llm.fallback(kind)`): extract (missing/invalid keys) → no state change; probes (missing/invalid) → one template probe per candidate, "Is it still true that <memory text>?"; judge → retried once with a changed prompt, then verdict "vague" (0.5), `determined_by_change` null.
+- Ties: totals within `cfg.tie_eps` are tied → smaller |R|. Token budgets: `cfg.probe_max_tokens`, `cfg.judge_max_tokens`.
 - Ablation `use_counterfactual=false`: select R3 (apply all proposed actions) without probes.
 - Ablation `use_minimality=false`: λc = λs = 0.
 
 ## 11. Phase E — Commit (`pipeline/commit.py`) — Paper IV-E
 
 ```python
-def commit(store, rs, revised, conditions, obs) -> list[dict]   # version transitions
+def commit(store, rs, revised, conditions, new_mem) -> list[dict]   # version transitions; new_mem = observation_memory(...)
 def validate(store, probes, delta, obs, expected_benefit) -> dict
 ```
 - The observation memory (`observation_memory`) is added to the store in the same commit (version 1, status active).
-- REVISE → update text; REVOKE → status "revoked"; VERIFY → status "pending_verify", add to pending queue; CONDITIONAL → status "conditional", store condition; all push history.
+- `commit` raises ValueError if `rs.feasible` is False.
+- REVISE → update text, set status "active" and clear any condition (via `update(..., clear_condition=True)`); REVOKE → status "revoked"; VERIFY → status "pending_verify", add to pending queue; CONDITIONAL → status "conditional", store condition; all push history.
 - Validation re-runs probes on committed store; warn if |benefit − expected| > 0.01.
 
 ## 12. Orchestrator + public API (`pipeline/run.py`, `csmr/api.py`)

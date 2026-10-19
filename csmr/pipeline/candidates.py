@@ -27,6 +27,14 @@ def build_candidates(delta: StateChange, obs: Observation, roots: list[str],
 
     cands = {r: CandidateInfo(r, 0, "root", is_root=True) for r in roots if r in mems}
 
+    frontier = [i for i, c in cands.items() if c.is_root]  # hops expand from roots only (SPEC §3)
+    for hop in range(1, cfg["max_hops"] + 1):
+        new = [i for i in ids if i not in cands and any(related(mems[i], a) for a in frontier)]
+        for i in new:
+            cands[i] = CandidateInfo(i, hop, "hop")
+        frontier = new
+
+    # top-K hits not already reached by hop expansion (hop-reached ones keep their hop, SPEC §3)
     # entity restriction falls back to all memories if it leaves fewer than K
     pool = [i for i in ids if mems[i].entity == delta.entity]
     if len(pool) < cfg["top_k"]:
@@ -36,11 +44,4 @@ def build_candidates(delta: StateChange, obs: Observation, roots: list[str],
         # attribute/similarity filter: same entity and (same attribute as Δ or similar enough to the observation)
         if i not in cands and m.entity == delta.entity and (m.attribute == delta.attribute or cos(q, vecs[i]) >= cfg["topk_min_sim"]):
             cands[i] = CandidateInfo(i, 2, "topk")
-
-    frontier = [i for i, c in cands.items() if c.is_root]  # hops expand from roots only (SPEC §3)
-    for hop in range(1, cfg["max_hops"] + 1):
-        new = [i for i in ids if i not in cands and any(related(mems[i], a) for a in frontier)]
-        for i in new:
-            cands[i] = CandidateInfo(i, hop, "hop")
-        frontier = new
     return cands

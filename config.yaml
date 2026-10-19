@@ -76,6 +76,10 @@ lambda_e: 0.1       # evidence cost
 lambda_s: 0.05      # repair size
 verify_cost: 0.1
 call_cost: 0.0
+tie_eps: 1.0e-6        # totals within this are tied -> smaller |R| wins
+probe_max_tokens: 2048  # reasoning model needs headroom before the JSON
+judge_max_tokens: 1024
+validation_tol: 0.01   # Phase E: warn if |committed benefit - expected| exceeds this
 r4_min_pdep: 0.2
 
 # Downstream agent

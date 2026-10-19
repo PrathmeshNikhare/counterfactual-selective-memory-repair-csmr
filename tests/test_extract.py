@@ -50,3 +50,40 @@ def test_car_sale_real():
     pz = Observation("I like pizza.", "user", "2026-06-01")
     d2 = extract_state_change(pz, sorted({m.attribute for m in sc.memories}))
     assert d2 is None or find_roots(d2, pz, store) == []
+
+
+@pytest.mark.parametrize("bad", [{}, {"state_change": {"entity": "user"}}, {"state_change": {
+    "entity": "user", "attribute": "a", "new": "x", "confidence": "high"}}])
+def test_malformed_extraction_is_no_state_change(monkeypatch, bad):
+    from csmr import llm
+    from csmr.pipeline.extract import extract_state_change
+    from csmr.types import Observation
+    llm.reset_stats()
+    monkeypatch.setattr(llm, "call", lambda p, **k: bad)
+    assert extract_state_change(Observation("I sold my car", "user", "2025-01-01"), []) is None
+    assert llm.stats()["fallbacks"] == {"extract": 1}
+
+
+def test_undecodable_extraction_json_is_no_state_change(monkeypatch):
+    import json
+    from csmr import llm
+    from csmr.pipeline.extract import extract_state_change
+    from csmr.types import Observation
+
+    def boom(p, **k):
+        raise json.JSONDecodeError("bad", "", 0)
+
+    llm.reset_stats()
+    monkeypatch.setattr(llm, "call", boom)
+    assert extract_state_change(Observation("x", "user", ""), []) is None
+    assert llm.stats()["fallbacks"] == {"extract": 1}
+
+
+def test_explicit_null_state_change_is_not_a_fallback(monkeypatch):
+    from csmr import llm
+    from csmr.pipeline.extract import extract_state_change
+    from csmr.types import Observation
+    llm.reset_stats()
+    monkeypatch.setattr(llm, "call", lambda p, **k: {"state_change": None})
+    assert extract_state_change(Observation("I like tea", "user", ""), []) is None
+    assert llm.stats()["fallbacks"] == {}

@@ -35,13 +35,21 @@ change_type:
 def extract_state_change(obs: Observation, known_attributes: list[str]) -> StateChange | None:
     """Paper IV-A: Δ = (entity, attribute, old, new, time, source, confidence). One LLM call."""
     prompt = EXTRACT_PROMPT.format(text=obs.text, known=sorted(set(known_attributes)) or "none")
-    sc = llm.call(prompt, json_mode=True, max_tokens=load_config()["extract_max_tokens"]).get("state_change")
+    out = llm.try_json(prompt, max_tokens=load_config()["extract_max_tokens"])
+    if out is None or "state_change" not in out:
+        llm.fallback("extract", "malformed response; treated as no state change")
+        return None
+    sc = out["state_change"]
     if not sc:
         return None
-    return StateChange(entity=sc["entity"], attribute=sc["attribute"], old=sc.get("old"), new=str(sc["new"]),
-                       time=obs.time, source=obs.source, confidence=float(sc["confidence"]),
-                       statement=sc.get("statement") or obs.text,
-                       change_type="remove" if sc.get("change_type") == "remove" else "replace")
+    try:
+        return StateChange(entity=sc["entity"], attribute=sc["attribute"], old=sc.get("old"), new=str(sc["new"]),
+                           time=obs.time, source=obs.source, confidence=float(sc["confidence"]),
+                           statement=sc.get("statement") or obs.text,
+                           change_type="remove" if sc.get("change_type") == "remove" else "replace")
+    except (KeyError, TypeError, ValueError, AttributeError):
+        llm.fallback("extract", f"missing/invalid fields in {sc!r}; treated as no state change")
+        return None
 
 
 def find_roots(delta: StateChange, obs: Observation, store: MemoryStoreAdapter) -> list[str]:
