@@ -19,8 +19,10 @@ from csmr.scenario import load_scenario  # noqa: E402
 
 def main() -> None:
     sc = load_scenario(sys.argv[1] if len(sys.argv) > 1 else "data/dev/car_sale_distractors.json")
-    csmr = CSMR(InMemoryAdapter(sc.memories))
-    print(f"{len(sc.memories)} memories loaded. State a change, or ask a question ('?' at the end).")
+    memories = sc.memories
+    del sc  # gold lives on the Scenario; drop it so nothing downstream can reach it
+    csmr = CSMR(InMemoryAdapter(memories))
+    print(f"{len(memories)} memories loaded. State a change, or ask a question ('?' at the end).")
     while True:
         try:
             line = input("you> ").strip()

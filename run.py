@@ -36,7 +36,9 @@ def main() -> None:
                     help="override a config value, dotted keys allowed (e.g. ablation.use_evidence=false)")
     args = ap.parse_args()
     sc = load_scenario(args.scenario)
-    trace = run_pipeline(sc.observation, InMemoryAdapter(sc.memories), load_config(overrides=args.overrides)).to_dict()
+    memories, observation = sc.memories, sc.observation
+    del sc  # gold lives on the Scenario; drop it so nothing downstream can reach it
+    trace = run_pipeline(observation, InMemoryAdapter(memories), load_config(overrides=args.overrides)).to_dict()
     print(summary(trace))
     if args.trace:
         Path(args.trace).parent.mkdir(parents=True, exist_ok=True)
