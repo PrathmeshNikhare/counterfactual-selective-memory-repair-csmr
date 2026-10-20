@@ -64,4 +64,6 @@ def test_every_key_the_code_reads_is_in_config_yaml():
 def test_classifier_weights_cover_every_feature():
     cfg = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
     assert set(dependency.FEATURES) <= set(cfg["dependency_weights"])
+    assert "nli_contra_topical" in dependency.FEATURES and "nli_contra_new" not in cfg["dependency_weights"]
+    assert cfg["dependency_weights"]["nli_contra_topical"] == 2.0  # inherited from the old nli_contra_new
     assert set(evidence.FEATURES) <= set(cfg["evidence_weights"])

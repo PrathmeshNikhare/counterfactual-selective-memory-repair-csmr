@@ -40,7 +40,7 @@ dependency_weights:
   same_entity: 0.2
   same_attribute: 1.5
   nli_entail: 1.0
-  nli_contra_new: 2.0
+  nli_contra_topical: 2.0
   temporal_after: 0.2
   same_source: 0.1
   causal_cue: 3.0

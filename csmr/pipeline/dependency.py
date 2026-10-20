@@ -16,7 +16,7 @@ A: {a}
 B: {b}
 Answer yes or no. Return JSON only: {{"answer": "yes" or "no"}}"""
 
-FEATURES = ["cos_sim", "same_entity", "same_attribute", "nli_entail", "nli_contra_new", "temporal_after",
+FEATURES = ["cos_sim", "same_entity", "same_attribute", "nli_entail", "nli_contra_topical", "temporal_after",
             "same_source", "causal_cue", "hop_closeness"]
 _MODEL_FILE = ROOT / "models" / "dependency.json"
 
@@ -39,12 +39,14 @@ def dependency_features(root: Memory, cand: Memory, delta: StateChange, obs: Obs
     if cue is None:
         llm.fallback("causal_cue", f"malformed response for {cand.id}; cue = no")
         cue = {"answer": "no"}
+    cos = max(0.0, float(a @ b))
     return {
-        "cos_sim": max(0.0, float(a @ b)),
+        "cos_sim": cos,
         "same_entity": float(root.entity == cand.entity),
         "same_attribute": float(root.attribute == cand.attribute),
         "nli_entail": models.nli(root.text, cand.text)["entailment"],
-        "nli_contra_new": models.nli(delta.statement or delta.as_sentence(), cand.text)["contradiction"],
+        # NLI calls unrelated sentences "contradictions"; only meaningful for topically related pairs
+        "nli_contra_topical": models.nli(delta.statement or delta.as_sentence(), cand.text)["contradiction"] * cos,
         "temporal_after": float(cand.time > root.time),
         "same_source": float(root.source == cand.source),
         "causal_cue": float(str(cue["answer"]).strip().lower().startswith("y")),

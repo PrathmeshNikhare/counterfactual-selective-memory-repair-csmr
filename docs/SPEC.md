@@ -83,8 +83,8 @@ Features (all in [0,1]):
 | `same_entity` | 1/0 |
 | `same_attribute` | 1/0 |
 | `nli_entail` | nli(root.text, cand.text).entailment |
-| `nli_contra_new` | nli(delta.statement, cand.text).contradiction (falls back to "The {entity}'s {attribute} is now {new}." if statement is empty) |
-| `temporal_after` | cand written after root (1/0) |
+| `nli_contra_topical` | nli(delta.statement, cand.text).contradiction × `cos_sim` (NLI contradiction is only meaningful for topically related pairs; unrelated sentences score ≈1 otherwise; falls back to "The {entity}'s {attribute} is now {new}." if statement is empty) |
+| `temporal_after` | cand written after root (1/0), per (root, cand) pair; ISO timestamps compare correctly as strings |
 | `same_source` | 1/0 |
 | `causal_cue` | LLM yes/no (JSON `{"answer": "yes"|"no"}`) → 1/0: "If statement A stopped being true, would statement B likely need to be re-checked or updated? A: {root.text} B: {cand.text} Answer yes or no." |
 | `hop_closeness` | 1.0 hop0, 0.6 hop1, 0.3 hop2 |

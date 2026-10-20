@@ -73,3 +73,26 @@ def test_cue_max_tokens_from_config(monkeypatch):
     seen = []
     _cue(monkeypatch, lambda p, **k: seen.append(k["max_tokens"]) or {"answer": "no"})
     assert seen == [load_config()["cue_max_tokens"]]
+
+
+def test_nli_contra_topical_is_nli_times_cos(monkeypatch):
+    from csmr import models
+    monkeypatch.setattr(llm, "call", lambda p, **k: {"answer": "no"})
+    monkeypatch.setattr(models, "nli", lambda a, b: {"entailment": 0.0, "contradiction": 0.8, "neutral": 0.2})
+    sc = load_scenario("data/dev/car_sale.json")
+    store, d = InMemoryAdapter(sc.memories), _car_delta(sc)
+    info = build_candidates(d, sc.observation, ["M1"], store)["M2"]
+    f = dependency.dependency_features(store.get("M1"), store.get("M2"), d, sc.observation, info)
+    assert f["nli_contra_topical"] == pytest.approx(0.8 * f["cos_sim"]) and "nli_contra_new" not in f
+
+
+def test_temporal_after_is_per_root_pair(monkeypatch):
+    # an old memory is "after" an older root but not "after" a newer root (e.g. the stored message-1 note)
+    monkeypatch.setattr(llm, "call", lambda p, **k: {"answer": "no"})
+    sc = load_scenario("data/dev/car_sale_distractors.json")
+    store, d = InMemoryAdapter(sc.memories), _car_delta(sc)
+    info = build_candidates(d, sc.observation, ["M1"], store)["M2"]
+    newer_root = store.get("M1").__class__(**{**store.get("M1").__dict__, "id": "OBS26", "time": "2026-06-02T09:00:00"})
+    tf = lambda root, cand: dependency.dependency_features(root, cand, d, sc.observation, info)["temporal_after"]
+    m6 = store.get("M6")  # 2026-03-02
+    assert (tf(store.get("M1"), m6), tf(newer_root, m6)) == (1.0, 0.0)
