@@ -1,6 +1,6 @@
 """Terminal demo: a line ending in '?' is a question to the agent; any other line is an observation (CSMR repairs memory).
 
-    python examples/chat_agent.py [data/dev/car_sale.json]
+    python examples/chat_agent.py [data/dev/car_sale_distractors.json]
 
 Type e.g. "I sold my car", then "how do I get to work?". Empty line / Ctrl-D quits.
 Gold labels in the scenario file are never read: only its memories seed the store.
@@ -18,7 +18,7 @@ from csmr.scenario import load_scenario  # noqa: E402
 
 
 def main() -> None:
-    sc = load_scenario(sys.argv[1] if len(sys.argv) > 1 else "data/dev/car_sale.json")
+    sc = load_scenario(sys.argv[1] if len(sys.argv) > 1 else "data/dev/car_sale_distractors.json")
     csmr = CSMR(InMemoryAdapter(sc.memories))
     print(f"{len(sc.memories)} memories loaded. State a change, or ask a question ('?' at the end).")
     while True:

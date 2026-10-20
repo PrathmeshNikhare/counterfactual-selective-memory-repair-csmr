@@ -60,7 +60,7 @@ def test_non_question_without_state_change_is_stored_and_questions_are_ignored(m
 
 @pytest.mark.llm
 def test_three_message_demo_sequence_pinned_time():
-    api = CSMR(InMemoryAdapter(load_scenario("data/dev/car_sale.json").memories))
+    api = CSMR(InMemoryAdapter(load_scenario("data/dev/car_sale_distractors.json").memories))
     t1 = api.observe("I own a car and drive to work every day", time="2026-06-02T09:00:00")
     assert all(a == "KEEP" for a in t1.final_actions.values())  # confirmation: no repairs
     t2 = api.observe("I sold my car", time="2026-06-02T09:05:00")

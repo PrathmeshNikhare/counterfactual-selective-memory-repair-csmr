@@ -1,0 +1,282 @@
+{
+  "id": "dev_car_sale_distractors",
+  "category": "one_hop",
+  "domain": "vehicle",
+  "note": "car_sale.json plus 20 unrelated distractor memories (gold KEEP) so top-k retrieval is not the whole store.",
+  "memories": [
+    {
+      "id": "M1",
+      "text": "The user owns a car.",
+      "entity": "user",
+      "attribute": "vehicle_ownership",
+      "time": "2026-03-01T10:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M2",
+      "text": "The user drives to work by car.",
+      "entity": "user",
+      "attribute": "commute_mode",
+      "time": "2026-03-05T09:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M3",
+      "text": "The user spends money on fuel.",
+      "entity": "user",
+      "attribute": "expenses",
+      "time": "2026-04-02T18:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M4",
+      "text": "The user prefers driving.",
+      "entity": "user",
+      "attribute": "travel_preference",
+      "time": "2026-04-10T12:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M5",
+      "text": "The user likes Italian food.",
+      "entity": "user",
+      "attribute": "food_preference",
+      "time": "2026-02-14T20:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M6",
+      "text": "The user plays the guitar on weekends.",
+      "entity": "user",
+      "attribute": "hobbies",
+      "time": "2026-03-02T09:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M7",
+      "text": "The user enjoys hiking in the Sahyadri hills.",
+      "entity": "user",
+      "attribute": "hobbies",
+      "time": "2026-03-03T10:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M8",
+      "text": "The user reads science fiction novels before bed.",
+      "entity": "user",
+      "attribute": "hobbies",
+      "time": "2026-03-04T11:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M9",
+      "text": "The user has a younger sister who studies medicine.",
+      "entity": "user",
+      "attribute": "family",
+      "time": "2026-03-05T12:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M10",
+      "text": "The user's parents live in Nagpur.",
+      "entity": "user",
+      "attribute": "family",
+      "time": "2026-03-06T13:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M11",
+      "text": "The user is planning a family dinner for their mother's birthday.",
+      "entity": "user",
+      "attribute": "family",
+      "time": "2026-03-07T14:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M12",
+      "text": "The user works from 10am to 6pm on weekdays.",
+      "entity": "user",
+      "attribute": "work_schedule",
+      "time": "2026-03-08T15:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M13",
+      "text": "The user has a team stand-up every morning at 10:15.",
+      "entity": "user",
+      "attribute": "work_schedule",
+      "time": "2026-03-09T16:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M14",
+      "text": "The user takes Fridays off once a month.",
+      "entity": "user",
+      "attribute": "work_schedule",
+      "time": "2026-03-10T17:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M15",
+      "text": "The user is allergic to peanuts.",
+      "entity": "user",
+      "attribute": "food_preference",
+      "time": "2026-03-11T18:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M16",
+      "text": "The user drinks filter coffee in the morning.",
+      "entity": "user",
+      "attribute": "food_preference",
+      "time": "2026-04-12T09:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M17",
+      "text": "The user cooks dal and rice on Sunday evenings.",
+      "entity": "user",
+      "attribute": "food_preference",
+      "time": "2026-04-13T10:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M18",
+      "text": "The user dislikes mushrooms.",
+      "entity": "user",
+      "attribute": "food_preference",
+      "time": "2026-04-14T11:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M19",
+      "text": "The user uses a mechanical keyboard at their desk.",
+      "entity": "user",
+      "attribute": "devices",
+      "time": "2026-04-15T12:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M20",
+      "text": "The user's laptop has 16 GB of RAM.",
+      "entity": "user",
+      "attribute": "devices",
+      "time": "2026-04-16T13:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M21",
+      "text": "The user wears a smartwatch to track sleep.",
+      "entity": "user",
+      "attribute": "devices",
+      "time": "2026-04-17T14:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M22",
+      "text": "The user listens to podcasts on wireless earbuds.",
+      "entity": "user",
+      "attribute": "devices",
+      "time": "2026-04-18T15:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M23",
+      "text": "The user practices yoga every Sunday morning.",
+      "entity": "user",
+      "attribute": "health",
+      "time": "2026-04-19T16:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M24",
+      "text": "The user is learning Spanish on a language app.",
+      "entity": "user",
+      "attribute": "education",
+      "time": "2026-04-20T17:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M25",
+      "text": "The user keeps several plants on their balcony.",
+      "entity": "user",
+      "attribute": "home",
+      "time": "2026-04-21T18:00:00",
+      "source": "user"
+    }
+  ],
+  "observation": {
+    "text": "I sold my car.",
+    "source": "user",
+    "time": "2026-06-01T11:00:00"
+  },
+  "gold": {
+    "actions": {
+      "M1": "REVOKE",
+      "M2": "REVISE",
+      "M3": "VERIFY",
+      "M4": "KEEP",
+      "M5": "KEEP",
+      "M6": "KEEP",
+      "M7": "KEEP",
+      "M8": "KEEP",
+      "M9": "KEEP",
+      "M10": "KEEP",
+      "M11": "KEEP",
+      "M12": "KEEP",
+      "M13": "KEEP",
+      "M14": "KEEP",
+      "M15": "KEEP",
+      "M16": "KEEP",
+      "M17": "KEEP",
+      "M18": "KEEP",
+      "M19": "KEEP",
+      "M20": "KEEP",
+      "M21": "KEEP",
+      "M22": "KEEP",
+      "M23": "KEEP",
+      "M24": "KEEP",
+      "M25": "KEEP"
+    },
+    "dependencies": [
+      [
+        "M1",
+        "M2"
+      ],
+      [
+        "M1",
+        "M3"
+      ]
+    ],
+    "eval_questions": [
+      {
+        "q": "Does the user currently own a car?",
+        "gold_answer": "No, the user sold their car.",
+        "depends_on": [
+          "M1"
+        ]
+      },
+      {
+        "q": "How does the user commute to work?",
+        "gold_answer": "Unknown; not by their own car since they sold it.",
+        "depends_on": [
+          "M2"
+        ]
+      },
+      {
+        "q": "Does the user prefer driving?",
+        "gold_answer": "Yes.",
+        "depends_on": [
+          "M4"
+        ]
+      },
+      {
+        "q": "What food does the user like?",
+        "gold_answer": "Italian food.",
+        "depends_on": [
+          "M5"
+        ]
+      }
+    ]
+  }
+}
