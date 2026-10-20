@@ -284,3 +284,24 @@ def test_ablation_infeasible_r3_falls_back_to_largest_feasible_lower_set(monkeyp
     cfg = {**CFG, "ablation": {**CFG["ablation"], "use_counterfactual": False}}
     best, _ = cf.select(sets, probes, store, revised, {}, cands, DELTA, obs, cfg)
     assert best.name == "R0"
+
+
+def test_probe_order_roots_then_p_dep_then_numeric_id(monkeypatch):
+    sc = load_scenario("data/dev/car_sale_distractors.json")
+    cands = {"M12": _c("M12", 1, .5, .9), "M2": _c("M2", 2, .9, .9), "M1": _c("M1", 2, .1, 1, True),
+             "M3": _c("M3", 1, .5, .9)}
+    qs = {m: f"q{m}" for m in cands}
+    monkeypatch.setattr(llm, "call", lambda p, **k: {"change_question": "D?", "memory_questions": qs})
+    out = cf.generate_probes(DELTA, sc.observation, cands, InMemoryAdapter(sc.memories), 9)
+    assert out == ["D?", "qM1", "qM2", "qM3", "qM12"]  # root first; higher p_dep next; ties by numeric id
+
+
+@pytest.mark.parametrize("ans", ["Yes, the user drives to work every day.", "Yes, the user spends money on fuel."])
+@pytest.mark.parametrize("determined", [True, False])
+def test_stale_claim_is_contradicts_whatever_determined_is(monkeypatch, ans, determined):
+    sc = load_scenario("data/dev/car_sale.json")
+    seen = {}
+    monkeypatch.setattr(llm, "call", lambda p, **k: seen.update(p=p) or {"determined_by_change": determined, "verdict": "contradicts"})
+    out = cf.judge(ans, "Does the user drive to work every day?", DELTA, sc.observation, CFG)
+    assert out == {"determined_by_change": determined, "verdict": "contradicts", "score": 0.0}
+    assert "OR makes likely outdated" in seen["p"] and "whatever determined_by_change is" in seen["p"]

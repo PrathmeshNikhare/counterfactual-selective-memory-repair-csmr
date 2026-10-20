@@ -165,12 +165,13 @@ Retrieve top-k by cosine to the question from the given memory list; LLM answers
 ```python
 def generate_probes(delta, obs, cands, store, n: int) -> list[str]   # LLM; from Δ and candidates ONLY
 # NEUTRAL questions about the user's CURRENT state ("How does the user commute to work?"), never mentioning or presupposing the change.
-# One about Δ's attribute, then one per candidate (KEEP-proposed included, so over-repair is detectable), roots/closest hops first, capped at n (config n_probes=6).
+# One about Δ's attribute, then one per candidate (KEEP-proposed included, so over-repair is detectable), roots first, then by P_dep descending, ties by numeric memory id (never string order: "M12" must not outrank "M2"); capped at n (config n_probes=6).
 # Probes using a word only the observation introduces (e.g. "sold") are dropped.
 def judge(answer: str, question: str, delta, obs, cfg) -> dict       # ONE call, two explicit steps:
 # {"determined_by_change": bool, "verdict": "consistent"|"vague"|"contradicts"} -> score 1.0 / 0.5 / 0.0
 #   determined_by_change=false: "unknown"/uncertain answers are consistent (1.0)
-#   determined_by_change=true:  "unknown"/vague is vague (0.5); asserting what the change contradicts is 0.0
+#   determined_by_change=true:  "unknown"/vague is vague (0.5)
+#   An answer asserting something the change makes false OR likely outdated is "contradicts" (0.0) whatever determined_by_change is (e.g. "drives to work every day: Yes" after "sold their car"). determined_by_change only decides how unknown-like answers score.
 # Unknown-like answers (empty, or matching cfg.unknown_patterns when <= cfg.unknown_max_words words, or when the answer starts with a pattern) get the verdict IN CODE: consistent (1.0) if determined_by_change is false, vague (0.5) if true.
 #   The LLM verdict field is used only for answers that make a claim.
 # Probes are always third person ("the user"), never "you".

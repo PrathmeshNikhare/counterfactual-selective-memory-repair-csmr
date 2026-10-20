@@ -37,10 +37,11 @@ Decide in two steps.
 1. determined_by_change: does the new fact settle the correct answer to this question (true), or is the question
    unaffected / still undeterminable given the new fact (false)?
 2. verdict:
+   - "contradicts" (0.0): the answer asserts something the new fact contradicts OR makes likely outdated (e.g. it
+     still states a fact that held only because of the old state). This applies whatever determined_by_change is.
    - "consistent" (1.0): the answer is correct given the new fact. If determined_by_change is false, "unknown" or an
      uncertain answer is consistent.
    - "vague" (0.5): determined_by_change is true but the answer is "unknown" or vague.
-   - "contradicts" (0.0): the answer asserts something the new fact contradicts.
 Return JSON only: {{"determined_by_change": true | false, "verdict": "consistent" | "vague" | "contradicts"}}"""
 RETRY_NUDGE = "\nReturn exactly the JSON object described above."  # changes the prompt so the disk cache is not hit again
 PROBE_FALLBACK = "Is it still true that {text}?"
@@ -63,7 +64,7 @@ def generate_probes(delta: StateChange, obs: Observation, cands: dict[str, Candi
     mems = "\n".join(f"- {m}: {store.get(m).text}" for m in cands)
     out = llm.try_json(PROBE_PROMPT.format(attribute=delta.attribute.replace("_", " "), memories=mems),
                        max_tokens=cfg["probe_max_tokens"], cfg=cfg)
-    order = sorted(cands, key=lambda m: (not cands[m].is_root, cands[m].hop, m))
+    order = sorted(cands, key=lambda m: (not cands[m].is_root, -cands[m].p_dep, int(re.sub(r"\D", "", m) or 0), m))
     if (out is None or not str(out.get("change_question") or "").strip()
             or not isinstance(out.get("memory_questions"), dict)):
         llm.fallback("probes", "malformed response; one template probe per candidate")
