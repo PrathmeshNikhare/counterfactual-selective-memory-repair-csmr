@@ -35,8 +35,8 @@ Integration fixture for everything: `data/dev/car_sale.json`.
 - [x] **D5** run `method-auditor` on D1–D4 — especially the no-leakage check.
 
 ## Integration (whoever finishes first)
-- [ ] **I1** `tests/test_integration.py`: all 6 dev scenarios end-to-end; car scenario reproduces paper Table II.
-- [ ] **I2** ablation flags each change behaviour (test that toggling each flag changes at least one output on dev set).
+- [x] **I1** `tests/test_integration.py`: all 6 dev scenarios end-to-end; car scenario reproduces paper Table II.
+- [x] **I2** ablation flags each change behaviour (test that toggling each flag changes at least one output on dev set).
 
 ## Phase 2 — after dataset exists (see docs/DATASET_NOTE.md)
 - [ ] **E1 `baselines/`** — 7 baselines per SPEC §13.

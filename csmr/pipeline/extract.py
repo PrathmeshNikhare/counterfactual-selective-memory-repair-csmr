@@ -25,6 +25,8 @@ Also return "state_change": true or false.
 
 A state change needs some stored fact to become false or outdated. Adding a new fact that is compatible with
 the stored facts is NOT a state change.
+BUT a new fact IS a state change when it makes ANY stored fact false, including exclusive or absolute statements
+("only", "no other", "never", "always", "just one"): check the new fact against those words in the stored memories.
 Return "state_change": false if the observation only repeats or confirms what the stored memories above already
 say, or only adds something compatible (a new preference, a plain fact with nothing to replace).
 If no stored memories are shown, judge from the wording: a message that ends or replaces an earlier state
@@ -34,6 +36,8 @@ Examples:
   -> {{"entity": "user", "attribute": "yoga_routine", "statement": "The user goes to yoga every Sunday.", "state_change": false}}
 - memory "The user likes swimming.", observation "I also enjoy hiking."
   -> {{"entity": "user", "attribute": "hobbies", "statement": "The user enjoys hiking.", "state_change": false}}
+- memory "The user has only one bank account.", observation "I opened a second account at SBI."
+  -> {{"entity": "user", "attribute": "bank_accounts", "statement": "The user opened a second bank account at SBI.", "state_change": true, "old": "only one bank account", "new": "two bank accounts, including one at SBI", "confidence": 0.95, "change_type": "replace"}}
 Tentative, planned or hedged changes ("might", "planning to", "not sure") that would make a stored fact false or
 outdated MUST still be extracted, with a lower confidence; judging how weak the evidence is is not your job.
 
