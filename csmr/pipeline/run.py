@@ -12,7 +12,7 @@ from csmr.pipeline import dependency, evidence
 from csmr.pipeline.actions import propose_action
 from csmr.pipeline.candidates import build_candidates
 from csmr.pipeline.commit import commit, validate
-from csmr.pipeline.extract import extract_state_change, find_roots
+from csmr.pipeline.extract import extract, find_roots
 from csmr.pipeline.overlay import observation_memory
 from csmr.pipeline.repair_sets import generate_repair_sets
 from csmr.types import Action, Observation, Trace
@@ -32,7 +32,7 @@ def run_pipeline(obs: Observation, store: MemoryStoreAdapter, cfg: dict | None =
 
     # A
     related = [m.text for m in store.search(obs.text, cfg["extract_context_k"])]
-    delta = extract_state_change(obs, [m.attribute for m in store.all()], cfg, related=related)
+    delta, trace.note = extract(obs, [m.attribute for m in store.all()], cfg, related=related)
     if delta is None:
         return finish()
     trace.delta = asdict(delta)

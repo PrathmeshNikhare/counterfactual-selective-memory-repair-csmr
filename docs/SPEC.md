@@ -41,10 +41,12 @@ Lazy singletons:
 ## 2. Phase A — State-change extraction (`pipeline/extract.py`) — Paper IV-A
 
 ```python
-def extract_state_change(obs: Observation, known_attributes: list[str]) -> StateChange | None
+def extract(obs, known_attributes, cfg, *, related) -> tuple[StateChange | None, dict | None]   # (Δ, note)
+def extract_state_change(obs, known_attributes, cfg=None, *, related=None) -> StateChange | None   # extract(...)[0]
 def find_roots(delta: StateChange, obs: Observation, store) -> list[str]
 ```
-- One LLM call, JSON mode. Prompt asks for `entity, attribute, old, new, confidence, statement, change_type` (`statement` = third-person restatement of the observation, e.g. "The user sold their car."), or `{"state_change": null}`.
+- One LLM call, JSON mode. The response ALWAYS carries `entity, attribute, statement` (`statement` = third-person restatement of the observation, e.g. "The user sold their car.") and `"state_change": true|false`. When true it also carries `old, new, confidence, change_type` and becomes Δ. When false, Δ is `None` and `{entity, attribute, statement}` is returned as the **note** (`None` if the model omitted any of the three; `Trace.note`). A legacy nested `"state_change": {...}` object is accepted too.
+  A state change needs some stored fact to become false or outdated: adding a new fact compatible with the stored ones is NOT a state change (few-shot from an unrelated domain: "I also enjoy hiking" when memory says "likes swimming" → false).
   `change_type` ∈ {`remove` (fact stops holding with no new value of the same kind: "I cancelled my Netflix subscription", "I stopped going to yoga classes"), `replace` (a new value of the same kind: "I switched my bank account to HDFC", "My favourite team is now Mumbai Indians")} — the prompt carries these as few-shot examples, which must never mirror dev/test scenarios; stored on `StateChange.change_type` (default `replace`).
   Tentative / planned / hedged changes ("might", "planning to") are still extracted, with lower confidence; `null` only when the message changes no stored fact. Weak evidence is judged in Phase C, not here.
   Attribute should be a short snake_case key (e.g. `vehicle_ownership`, `employment`, `residence`).
@@ -212,10 +214,10 @@ class CSMR:
     def retrieve(self, query, k=5) -> list[str]     # excludes revoked, tags unverified/conditional
     def pending_verifications(self) -> list[Memory]
 ```
-`observe()` semantics: a text ending in `?` is a question — nothing is run or stored (empty trace). Otherwise `run_pipeline` runs; repair happens only if a state change is extracted (Phase E then also stores the observation memory). If no state change is extracted, `observe()` still stores the text verbatim as a new memory (`observation_memory(None, ...)`: id `OBS<n>`, entity `user`, attribute `general`) and records an `ADD` transition in the trace; no existing memory is touched. `run_pipeline` itself never stores when Δ is None (baselines/eval rely on that).
+`observe()` semantics: a text ending in `?` is a question — nothing is run or stored (empty trace). Otherwise `run_pipeline` runs; repair happens only if a state change is extracted (Phase E then also stores the observation memory). If no state change is extracted, `observe()` still stores the observation as a new memory (`observation_memory(None, obs, store, trace.note)`: id `OBS<n>`; text/entity/attribute come from the extractor's note, so a later observation can find it as a root. Only if the note is missing does it fall back to the raw text, entity `user`, attribute `general`) and records an `ADD` transition in the trace; no existing memory is touched. `run_pipeline` itself never stores when Δ is None (baselines/eval rely on that).
 LLM errors: a rate limit honours `Retry-After` (capped at `llm.max_retry_wait_s`); if the error text matches `llm.quota_patterns` (daily quota) `llm.QuotaExhausted` is raised ("Daily LLM quota exhausted - resume later; cached calls are kept") instead of retrying.
 
-Trace JSON contains: Δ, roots, candidates with all features, P_dep, S, proposed actions, every repair set with score breakdown + feasibility, chosen set, version transitions, LLM call stats, wall time.
+Trace JSON contains: Δ, note, roots, candidates with all features, P_dep, S, proposed actions, every repair set with score breakdown + feasibility, chosen set, version transitions, LLM call stats, wall time.
 
 Ablation flags (`config.yaml: ablation`):
 - `use_dependency=false` → P_dep = 1 for every candidate

@@ -24,7 +24,7 @@ class CSMR:
             return Trace(observation=asdict(obs))
         trace = run_pipeline(obs, self.store, self.cfg)
         if trace.delta is None:
-            m = observation_memory(None, obs, self.store)
+            m = observation_memory(None, obs, self.store, trace.note)
             self.store.add(m)
             trace.transitions.append({"id": m.id, "action": "ADD", "from_version": 0, "to_version": m.version,
                                       "from_status": None, "to_status": m.status})

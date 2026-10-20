@@ -10,11 +10,14 @@ from csmr.types import Action, Memory, Observation, RepairSet, StateChange
 NOTE_ENTITY, NOTE_ATTRIBUTE = "user", "general"  # unclassified observation (no state change extracted)
 
 
-def observation_memory(delta: StateChange | None, obs: Observation, store: MemoryStoreAdapter) -> Memory:
+def observation_memory(delta: StateChange | None, obs: Observation, store: MemoryStoreAdapter,
+                       note: dict | None = None) -> Memory:
     """The new observation as a memory (Spec 8): appended to every view and to the committed store.
-    With no delta it is stored verbatim under a generic entity/attribute (Spec 12)."""
-    return Memory(id=f"OBS{len(store.all(include_revoked=True)) + 1}", text=delta.statement or obs.text if delta else obs.text,
-                  entity=delta.entity if delta else NOTE_ENTITY, attribute=delta.attribute if delta else NOTE_ATTRIBUTE,
+    With no delta it is stored using the extractor's `note` (statement/entity/attribute), else verbatim under a
+    generic entity/attribute (Spec 12)."""
+    n = {"statement": delta.statement, "entity": delta.entity, "attribute": delta.attribute} if delta else note or {}
+    return Memory(id=f"OBS{len(store.all(include_revoked=True)) + 1}", text=n.get("statement") or obs.text,
+                  entity=n.get("entity", NOTE_ENTITY), attribute=n.get("attribute", NOTE_ATTRIBUTE),
                   time=obs.time, source=obs.source)
 
 

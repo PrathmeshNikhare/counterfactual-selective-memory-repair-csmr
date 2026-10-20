@@ -18,19 +18,28 @@ Reuse one of those keys if it fits; otherwise invent a short snake_case key (e.g
 Stored memories most similar to the observation:
 {related}
 
-Return JSON only.
-If the observation only repeats or confirms what the stored memories above already say, nothing changed:
-return {{"state_change": null}}. Example: memory "The user goes to yoga every Sunday." and observation
-"I still go to yoga every Sunday." -> {{"state_change": null}}.
-Tentative, planned or hedged changes ("might", "planning to", "not sure") MUST still be extracted, with a lower
-confidence; judging how weak the evidence is is not your job. Return null only if the message changes no stored
-fact at all, i.e. nothing stored becomes false or outdated (a new preference, a plain fact with nothing to
-replace): {{"state_change": null}}.
-Otherwise return:
-{{"state_change": {{"entity": "<who/what changed, e.g. user>", "attribute": "<snake_case key>",
-"old": "<previous value or null>", "new": "<new value>", "confidence": <0..1, lower if hedged/uncertain>,
-"statement": "<third-person restatement, e.g. The user sold their car.>",
-"change_type": "remove" or "replace"}}}}
+Return JSON only. ALWAYS return these three fields, even when nothing changed:
+"entity" (who/what the fact is about, e.g. user), "attribute" (snake_case key), and
+"statement" (third-person restatement of the observation, e.g. "The user sold their car.").
+Also return "state_change": true or false.
+
+A state change needs some stored fact to become false or outdated. Adding a new fact that is compatible with
+the stored facts is NOT a state change.
+Return "state_change": false if the observation only repeats or confirms what the stored memories above already
+say, or only adds something compatible (a new preference, a plain fact with nothing to replace).
+If no stored memories are shown, judge from the wording: a message that ends or replaces an earlier state
+(sold, quit, moved, switched, stopped, cancelled) reports a change; a plain new like or fact does not.
+Examples:
+- memory "The user goes to yoga every Sunday.", observation "I still go to yoga every Sunday."
+  -> {{"entity": "user", "attribute": "yoga_routine", "statement": "The user goes to yoga every Sunday.", "state_change": false}}
+- memory "The user likes swimming.", observation "I also enjoy hiking."
+  -> {{"entity": "user", "attribute": "hobbies", "statement": "The user enjoys hiking.", "state_change": false}}
+Tentative, planned or hedged changes ("might", "planning to", "not sure") that would make a stored fact false or
+outdated MUST still be extracted, with a lower confidence; judging how weak the evidence is is not your job.
+
+If "state_change" is true, also return:
+"old" (previous value or null), "new" (new value), "confidence" (0..1, lower if hedged/uncertain) and
+"change_type" ("remove" or "replace").
 change_type:
 - "remove" = the fact stops holding with no new value of the same kind
   (I cancelled my Netflix subscription, I stopped going to yoga classes)
@@ -38,28 +47,40 @@ change_type:
   (I switched my bank account to HDFC, My favourite team is now Mumbai Indians)"""
 
 
-def extract_state_change(obs: Observation, known_attributes: list[str], cfg: dict | None = None, *,
-                         related: list[str] | None = None) -> StateChange | None:
+def extract(obs: Observation, known_attributes: list[str], cfg: dict | None = None, *,
+            related: list[str] | None = None) -> tuple[StateChange | None, dict | None]:
     """Paper IV-A: Δ = (entity, attribute, old, new, time, source, confidence). One LLM call.
-    `related` = texts of the stored memories closest to the observation, so a confirmation can be told from a change."""
+    `related` = texts of the stored memories closest to the observation, so a confirmation can be told from a change.
+    Returns (Δ or None, note); note = {entity, attribute, statement} for storing a no-change message (None if the
+    model omitted any of them)."""
     prompt = EXTRACT_PROMPT.format(text=obs.text, known=sorted(set(known_attributes)) or "none",
                                    related="\n".join(f"- {t}" for t in related or []) or "(none)")
     cfg = cfg or load_config()
     out = llm.try_json(prompt, max_tokens=cfg["extract_max_tokens"], cfg=cfg)
     if out is None or "state_change" not in out:
         llm.fallback("extract", "malformed response; treated as no state change")
-        return None
+        return None, None
     sc = out["state_change"]
+    if isinstance(sc, dict):  # tolerate the model nesting the fields under "state_change"
+        out = {**out, **sc}
+    note = {k: out[k] for k in ("entity", "attribute", "statement") if out.get(k)}
+    note = note if len(note) == 3 else None
     if not sc:
-        return None
+        return None, note
     try:
-        return StateChange(entity=sc["entity"], attribute=sc["attribute"], old=sc.get("old"), new=str(sc["new"]),
-                           time=obs.time, source=obs.source, confidence=float(sc["confidence"]),
-                           statement=sc.get("statement") or obs.text,
-                           change_type="remove" if sc.get("change_type") == "remove" else "replace")
+        return StateChange(entity=out["entity"], attribute=out["attribute"], old=out.get("old"), new=str(out["new"]),
+                           time=obs.time, source=obs.source, confidence=float(out["confidence"]),
+                           statement=out.get("statement") or obs.text,
+                           change_type="remove" if out.get("change_type") == "remove" else "replace"), note
     except (KeyError, TypeError, ValueError, AttributeError):
-        llm.fallback("extract", f"missing/invalid fields in {sc!r}; treated as no state change")
-        return None
+        llm.fallback("extract", f"missing/invalid fields in {out!r}; treated as no state change")
+        return None, note
+
+
+def extract_state_change(obs: Observation, known_attributes: list[str], cfg: dict | None = None, *,
+                         related: list[str] | None = None) -> StateChange | None:
+    """Δ only (see `extract`)."""
+    return extract(obs, known_attributes, cfg, related=related)[0]
 
 
 def find_roots(delta: StateChange, obs: Observation, store: MemoryStoreAdapter, cfg: dict | None = None) -> list[str]:

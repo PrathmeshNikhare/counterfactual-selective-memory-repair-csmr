@@ -97,6 +97,7 @@ class Trace:
     """Full audit log of one observe() call (paper IV-E)."""
     observation: dict
     delta: Optional[dict] = None
+    note: Optional[dict] = None     # {entity, attribute, statement} of the observation (Spec 2), used when Δ is None
     roots: list[str] = field(default_factory=list)
     candidates: dict[str, dict] = field(default_factory=dict)
     probes: list[str] = field(default_factory=list)
