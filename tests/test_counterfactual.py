@@ -9,7 +9,7 @@ from csmr.pipeline import counterfactual as cf
 from csmr.pipeline.overlay import observation_memory, view
 from csmr.pipeline.repair_sets import generate_repair_sets
 from csmr.scenario import load_scenario
-from csmr.types import Action, CandidateInfo, StateChange
+from csmr.types import Action, CandidateInfo, Memory, StateChange
 
 CFG = load_config()
 DELTA = StateChange("user", "vehicle_ownership", "owns a car", "no car", "2026-06-01T11:00:00", "user", 0.95,
@@ -305,3 +305,53 @@ def test_stale_claim_is_contradicts_whatever_determined_is(monkeypatch, ans, det
     out = cf.judge(ans, "Does the user drive to work every day?", DELTA, sc.observation, CFG)
     assert out == {"determined_by_change": determined, "verdict": "contradicts", "score": 0.0}
     assert "OR makes likely outdated" in seen["p"] and "whatever determined_by_change is" in seen["p"]
+
+
+ALEMBIC_PAST = ("They used Alembic migrations generated from SQLAlchemy models, though the current method after moving "
+                "to MongoDB Atlas is unknown.")
+DB = StateChange("ShopKart", "project_database", "PostgreSQL 15", "MongoDB Atlas", "2026-10-21T17:45:00", "user", 0.95,
+                 "ShopKart's backend now runs entirely on MongoDB Atlas.")
+
+
+def _rule_aware_judge(p, **k):
+    """Stub judge that follows the prompt's past-mention rule: past-only mentions are not contradictions."""
+    past_rule = "NOT asserting it" in p and "Only claims about the CURRENT state can contradict" in p
+    current_claim = "Assistant answer: They use Alembic" in p
+    return {"determined_by_change": True, "verdict": "contradicts" if current_claim or not past_rule else "consistent"}
+
+
+def test_judge_past_mention_is_not_a_contradiction(monkeypatch):
+    sc = load_scenario("data/dev/car_sale.json")
+    assert len(ALEMBIC_PAST.split()) > CFG["unknown_max_words"]  # not unknown-like: the LLM verdict decides
+    monkeypatch.setattr(llm, "call", _rule_aware_judge)
+    q = "How are schema changes in ShopKart managed?"
+    assert cf.judge(ALEMBIC_PAST, q, DB, sc.observation, CFG)["verdict"] != "contradicts"
+    short = "Used Alembic before; current method unknown."  # short + "unknown": verdict set in code -> vague
+    assert cf.judge(short, q, DB, sc.observation, CFG)["verdict"] == "vague"
+    assert cf.judge("They use Alembic migrations.", q, DB, sc.observation, CFG)["score"] == 0.0
+
+
+@pytest.mark.llm
+def test_judge_past_mention_real_llm():
+    sc = load_scenario("data/showcase/02_db_migration_coding_assistant.json")
+    q = "How are schema changes in ShopKart managed?"
+    assert cf.judge(ALEMBIC_PAST, q, DB, sc.observation, CFG)["verdict"] != "contradicts"
+    assert cf.judge("They use Alembic migrations generated from the SQLAlchemy models.", q, DB, sc.observation,
+                    CFG)["verdict"] == "contradicts"
+
+
+def test_probe_prompt_names_subject_not_attribute_key(monkeypatch):
+    store = InMemoryAdapter([
+        Memory("M1", "The user's ShopKart backend uses PostgreSQL 15 as its main database.", "user", "project_database",
+               "2026-03-02"),
+        Memory("M11", "The user's side project stores data in SQLite.", "user", "side_project", "2026-07-10")])
+    obs = load_scenario("data/showcase/02_db_migration_coding_assistant.json").observation
+    seen = []
+    monkeypatch.setattr(llm, "call", lambda p, **k: seen.append(p) or {"change_question": "q?"})
+    cf.generate_probes(DB, obs, {"M1": _c("M1", 0, 1, 1, True), "M11": _c("M11", 1, .3, .9)}, store, 6)
+    p = seen[0]
+    assert "project_database" not in p and "project database" not in p
+    assert "current value of this stored fact: \"The user's ShopKart backend uses PostgreSQL 15" in p
+    assert "Name the specific subject exactly as the memory text names it" in p
+    cf.generate_probes(DB, obs, {"M11": _c("M11", 1, .3, .9)}, store, 6)  # no root: first candidate is the fact
+    assert "stored fact: \"The user's side project stores data in SQLite.\"" in seen[1]

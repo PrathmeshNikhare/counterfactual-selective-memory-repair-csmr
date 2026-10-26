@@ -4,7 +4,7 @@ from csmr import llm, models
 from csmr.adapters.memory import InMemoryAdapter
 from csmr.pipeline.extract import extract_state_change, find_roots
 from csmr.scenario import load_scenario
-from csmr.types import Observation, StateChange
+from csmr.types import Memory, Observation, StateChange
 
 CAR = {"state_change": {"entity": "user", "attribute": "vehicle_ownership", "old": "owns a car", "new": "no car",
                         "confidence": 0.95, "statement": "The user sold their car.", "change_type": "remove"}}
@@ -113,3 +113,32 @@ def test_action_and_judge_prompts_carry_date_only(monkeypatch):
     revise_text(Memory("M1", "The user owns a car.", "user", "vehicle_ownership", "2026-03-01"), d, obs)
     cf.judge("The user has no car.", "Does the user own a car?", d, obs, load_config())
     assert len(seen) == 2 and all("2026-06-02" in p and "09:41" not in p and "T09" not in p for p in seen)
+
+
+def test_prompt_carries_known_entities_and_temporary_flag(monkeypatch):
+    seen = []
+    out = {"state_change": True, "entity": "ShopKart", "attribute": "database", "statement": "s", "old": "a",
+           "new": "b", "confidence": 0.9, "change_type": "replace", "temporary": True}
+    monkeypatch.setattr(llm, "call", lambda p, **k: seen.append(p) or out)
+    d = extract_state_change(Observation("x", "user", ""), [], known_entities=["user", "ShopKart", "user"])
+    assert "['ShopKart', 'user']" in seen[0] and "MUST be that exact name" in seen[0]
+    assert d.temporary is True
+    out["temporary"] = "yes"  # only a real JSON true counts
+    assert extract_state_change(Observation("x", "user", ""), []).temporary is False
+    del out["temporary"]
+    assert extract_state_change(Observation("x", "user", ""), []).temporary is False
+
+
+def test_roots_match_entity_case_insensitively():
+    store = InMemoryAdapter([Memory("M1", "ShopKart uses PostgreSQL.", "ShopKart", "database", "2026-01-01"),
+                             Memory("M2", "ShopKart uses Redis.", "ShopKart", "cache", "2026-01-01")])
+    d = StateChange("shopkart", "database", "PostgreSQL", "MongoDB", "2026-02-01", "user", 0.9, "s")
+    assert find_roots(d, Observation("x", "user", "2026-02-01"), store) == ["M1"]
+
+
+@pytest.mark.parametrize("entity", [None, 3, ["user"], " "])
+def test_non_string_entity_is_no_state_change(monkeypatch, entity):
+    llm.reset_stats()
+    monkeypatch.setattr(llm, "call", lambda p, **k: {**CAR["state_change"], "state_change": True, "entity": entity})
+    assert extract_state_change(Observation("I sold my car", "user", ""), []) is None
+    assert llm.stats()["fallbacks"] == {"extract": 1}

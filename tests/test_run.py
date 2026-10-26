@@ -18,7 +18,7 @@ def _llm(revise):
     def call(p, **k):
         if "reports a CHANGE" in p:
             return CAR
-        if "stopped being true" in p:
+        if "FALSE or OUT OF DATE" in p:
             return {"answer": "yes" if "drives" in p.split("B:")[1] or "fuel" in p.split("B:")[1] else "no"}
         if "Write neutral questions" in p:
             return PROBES
@@ -49,7 +49,8 @@ def _run(monkeypatch, revise):
 def test_car_end_to_end_stubbed(monkeypatch):
     t, store = _run(monkeypatch, {"text": "The user previously drove to work by car; commute now unknown."})
     assert t.roots == ["M1"] and t.chosen == "R2"
-    assert t.final_actions == {"M1": "REVOKE", "M2": "REVISE", "M3": "VERIFY", "M4": "KEEP", "M5": "KEEP"}
+    # M3 REVISE (not Table II's VERIFY): dependents inherit the root's contradiction, Spec 5
+    assert t.final_actions == {"M1": "REVOKE", "M2": "REVISE", "M3": "REVISE", "M4": "KEEP", "M5": "KEEP"}
     assert "M5" not in t.candidates and t.validation["ok"] and t.llm_stats["fallbacks"] == {}
     assert store.get("M1").status == "revoked" and store.get("M2").version == 2 and store.get("M5").version == 1
     assert {x["id"] for x in t.transitions} == {"M1", "M2", "M3", "OBS6"}

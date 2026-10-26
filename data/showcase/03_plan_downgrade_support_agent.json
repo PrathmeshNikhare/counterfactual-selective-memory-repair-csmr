@@ -1,0 +1,41 @@
+{
+  "id": "showcase_plan_downgrade",
+  "category": "one_hop",
+  "domain": "customer_support",
+  "note": "Customer-support agent with account memory. The customer downgrades plans. Plan-bound entitlements must be repaired; contacts, region and plan-independent integrations must stay. Seat count and billing terms are only possibly affected (VERIFY).",
+  "memories": [
+    {"id": "M1", "text": "The customer's company, Acme Logistics, is on the Enterprise plan.", "entity": "user", "attribute": "subscription_plan", "time": "2025-11-01T10:00:00", "source": "tool"},
+    {"id": "M2", "text": "Acme Logistics uses SAML single sign-on through Okta, which is an Enterprise-plan feature.", "entity": "user", "attribute": "sso", "time": "2025-11-15T11:00:00", "source": "tool"},
+    {"id": "M3", "text": "Acme Logistics has a dedicated customer success manager, Priya, included with their Enterprise plan.", "entity": "user", "attribute": "account_manager", "time": "2025-11-02T10:00:00", "source": "tool"},
+    {"id": "M4", "text": "Acme Logistics' API rate limit is 10,000 requests per minute under their Enterprise contract.", "entity": "user", "attribute": "api_limits", "time": "2025-12-01T10:00:00", "source": "tool"},
+    {"id": "M5", "text": "Acme Logistics keeps audit logs for one year, an Enterprise-plan retention setting.", "entity": "user", "attribute": "audit_logs", "time": "2026-01-10T10:00:00", "source": "tool"},
+    {"id": "M6", "text": "Acme Logistics is billed annually by invoice, with payment due within 45 days.", "entity": "user", "attribute": "billing_terms", "time": "2025-11-01T10:05:00", "source": "tool"},
+    {"id": "M7", "text": "Acme Logistics currently has 240 active seats.", "entity": "user", "attribute": "seats", "time": "2026-09-01T10:00:00", "source": "tool"},
+    {"id": "M8", "text": "Acme Logistics' primary admin contact is Rohit Mehta, their IT manager.", "entity": "user", "attribute": "admin_contact", "time": "2025-11-01T10:10:00", "source": "tool"},
+    {"id": "M9", "text": "Acme Logistics' account data is stored in the Mumbai data region.", "entity": "user", "attribute": "data_region", "time": "2025-11-01T10:15:00", "source": "tool"},
+    {"id": "M10", "text": "Acme Logistics syncs contacts with Salesforce using the native connector, which is available on all plans.", "entity": "user", "attribute": "integrations", "time": "2026-02-14T12:00:00", "source": "tool"},
+    {"id": "M11", "text": "Acme Logistics prefers support updates by email rather than phone calls.", "entity": "user", "attribute": "contact_preference", "time": "2026-03-03T15:00:00", "source": "user"},
+    {"id": "M12", "text": "Acme Logistics is a freight company with offices in Mumbai and Chennai.", "entity": "user", "attribute": "company_profile", "time": "2025-11-01T10:20:00", "source": "tool"},
+    {"id": "M13", "text": "Acme Logistics raised a ticket in August about slow CSV exports, which has been resolved.", "entity": "user", "attribute": "ticket_history", "time": "2026-08-28T16:00:00", "source": "tool"},
+    {"id": "M14", "text": "Acme Logistics' fiscal year starts in April.", "entity": "user", "attribute": "fiscal_year", "time": "2026-01-05T10:00:00", "source": "user"},
+    {"id": "M15", "text": "Rohit Mehta prefers meetings scheduled in the morning, India time.", "entity": "user", "attribute": "meeting_preference", "time": "2026-03-03T15:05:00", "source": "user"},
+    {"id": "M16", "text": "Acme Logistics evaluated a competitor's product in early 2026 but chose to stay.", "entity": "user", "attribute": "account_history", "time": "2026-02-20T11:00:00", "source": "tool"}
+  ],
+  "observation": {"text": "Hi, this is Rohit from Acme Logistics. We've downgraded from the Enterprise plan to the Team plan, effective this month.", "source": "user", "time": "2026-10-20T10:30:00"},
+  "gold": {
+    "actions": {
+      "M1": "REVISE", "M2": "REVISE", "M3": "REVISE", "M4": "REVISE", "M5": "REVISE", "M6": "VERIFY",
+      "M7": "VERIFY", "M8": "KEEP", "M9": "KEEP", "M10": "KEEP", "M11": "KEEP", "M12": "KEEP",
+      "M13": "KEEP", "M14": "KEEP", "M15": "KEEP", "M16": "KEEP"
+    },
+    "dependencies": [["M1", "M2"], ["M1", "M3"], ["M1", "M4"], ["M1", "M5"], ["M1", "M6"], ["M1", "M7"]],
+    "eval_questions": [
+      {"q": "Which plan is Acme Logistics on?", "gold_answer": "The Team plan.", "depends_on": ["M1"]},
+      {"q": "Does Acme Logistics have a dedicated customer success manager?", "gold_answer": "No longer / unknown; the dedicated CSM was part of the Enterprise plan.", "depends_on": ["M3"]},
+      {"q": "What is Acme Logistics' API rate limit?", "gold_answer": "Unknown; the 10,000 requests-per-minute Enterprise limit no longer applies.", "depends_on": ["M4"]},
+      {"q": "Can Acme Logistics use SAML single sign-on?", "gold_answer": "Not on the Team plan / unknown; SSO was an Enterprise feature.", "depends_on": ["M2"]},
+      {"q": "Who is Acme Logistics' primary admin contact?", "gold_answer": "Rohit Mehta, IT manager.", "depends_on": ["M8"]},
+      {"q": "Does Acme Logistics sync contacts with Salesforce?", "gold_answer": "Yes, via the native connector, which is available on all plans.", "depends_on": ["M10"]}
+    ]
+  }
+}

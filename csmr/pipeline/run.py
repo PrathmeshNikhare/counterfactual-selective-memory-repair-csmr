@@ -32,7 +32,8 @@ def run_pipeline(obs: Observation, store: MemoryStoreAdapter, cfg: dict | None =
 
     # A
     related = [m.text for m in store.search(obs.text, cfg["extract_context_k"])]
-    delta, trace.note = extract(obs, [m.attribute for m in store.all()], cfg, related=related)
+    delta, trace.note = extract(obs, [m.attribute for m in store.all()], cfg, related=related,
+                                known_entities=[m.entity for m in store.all()])
     if delta is None:
         return finish()
     trace.delta = asdict(delta)

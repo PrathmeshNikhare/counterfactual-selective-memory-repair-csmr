@@ -6,7 +6,7 @@ from csmr.config import load_config
 from csmr.pipeline import actions, dependency, evidence
 from csmr.pipeline.candidates import build_candidates
 from csmr.scenario import load_scenario
-from csmr.types import Action, StateChange
+from csmr.types import Action, CandidateInfo, StateChange
 
 CFG = load_config()
 
@@ -26,7 +26,8 @@ def test_car_actions(monkeypatch):
                     "The user sold their car.", "remove")
     a, _ = _acts("data/dev/car_sale.json", d, ["M1"], monkeypatch, ["drives", "fuel"])
     assert a["M1"] == Action.REVOKE and a["M2"] == Action.REVISE
-    assert a["M3"] == Action.VERIFY and a["M4"] == Action.KEEP
+    # dependents inherit the root's contradiction (Spec 5), so M3 shares M2's S: REVISE, not paper Table II's VERIFY
+    assert a["M3"] == Action.REVISE and a["M4"] == Action.KEEP
     assert actions.propose_action("M5", None, CFG) == Action.KEEP
 
 
@@ -77,3 +78,23 @@ def test_rewrite_max_tokens_from_config(monkeypatch):
     actions.revise_text(sc.memories[1], d, sc.observation)
     actions.condition_text(sc.memories[1], d, sc.observation)
     assert seen == [CFG["rewrite_max_tokens"]] * 2
+
+
+@pytest.mark.parametrize("change_type", ["replace", "remove"])
+def test_temporary_conditional_before_revise_revoke(change_type):
+    root = CandidateInfo("M1", 0, "root", is_root=True, p_dep=1.0, s_evidence=0.95, temporary=True)
+    dep = CandidateInfo("M2", 1, "hop", p_dep=0.9, s_evidence=0.95, temporary=True)
+    weak_link = CandidateInfo("M3", 1, "hop", p_dep=0.2, s_evidence=0.95, temporary=True)
+    assert actions.propose_action("M1", root, CFG, change_type) == Action.CONDITIONAL
+    assert actions.propose_action("M2", dep, CFG, change_type) == Action.CONDITIONAL
+    assert actions.propose_action("M3", weak_link, CFG, change_type) == Action.KEEP
+
+
+def test_revise_prompt_current_state_first_no_date(monkeypatch):
+    sc = load_scenario("data/dev/car_sale.json")
+    d = StateChange("user", "vehicle_ownership", "car", "none", sc.observation.time, "user", 0.9, "The user sold their car.")
+    seen = []
+    monkeypatch.setattr(llm, "call", lambda p, **k: seen.append(p) or {"text": "t"})
+    actions.revise_text(sc.memories[1], d, sc.observation)
+    assert "CURRENT state first" in seen[0] and "in brackets at the end" in seen[0]
+    assert "Do not include any date" in seen[0] and "as of" not in seen[0]

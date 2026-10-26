@@ -1,6 +1,6 @@
 """Counterfactual repair-set selection (Spec 10; Paper IV-D, Section V).
 
-Probes are generated from Delta + candidate memories only; gold labels are never read here.
+Probes are generated from candidate memory texts only (root text for the change question); gold labels are never read here.
 """
 from __future__ import annotations
 
@@ -19,9 +19,12 @@ from csmr.types import MODIFYING_ACTIONS, Action, CandidateInfo, Memory, Observa
 PROBE_PROMPT = """Write neutral questions about the user's CURRENT state, phrased as a user or a downstream task would
 ask them (e.g. "How does the user commute to work?", "Does the user own a car?", "Does the user prefer driving?").
 Always phrase them in the third person ("the user"), never "you" or "your".
+Name the specific subject exactly as the memory text names it (a project, product, place or person, e.g.
+"Which framework does the Acme app use?"), never a generic stand-in such as "the project" or a field name.
 Do NOT mention or presuppose any recent change or event (no "now that...", "after selling...", "since you...").
-Write one question per stored memory below (even if it seems unaffected) plus one question about the attribute
-"{attribute}". Questions must concern only those memories or that attribute, never unrelated topics.
+Write one question per stored memory below (even if it seems unaffected) plus one "change_question" asking for the
+current value of this stored fact: "{fact}"
+Questions must concern only those memories or that fact, never unrelated topics.
 
 Stored memories:
 {memories}
@@ -36,9 +39,11 @@ Assistant answer: {answer}
 Decide in two steps.
 1. determined_by_change: does the new fact settle the correct answer to this question (true), or is the question
    unaffected / still undeterminable given the new fact (false)?
-2. verdict:
-   - "contradicts" (0.0): the answer asserts something the new fact contradicts OR makes likely outdated (e.g. it
-     still states a fact that held only because of the old state). This applies whatever determined_by_change is.
+2. verdict. Only claims about the CURRENT state can contradict: mentioning an old value explicitly as past or
+   previous ("it used X before; the current method is unknown", "previously had X") is NOT asserting it.
+   - "contradicts" (0.0): the answer asserts something the new fact contradicts OR makes likely outdated, as the
+     current state (e.g. it still states a fact that held only because of the old state).
+     This applies whatever determined_by_change is.
    - "consistent" (1.0): the answer is correct given the new fact. If determined_by_change is false, "unknown" or an
      uncertain answer is consistent.
    - "vague" (0.5): determined_by_change is true but the answer is "unknown" or vague.
@@ -58,13 +63,14 @@ def _presupposes(q: str, obs: Observation, cands: dict[str, CandidateInfo], stor
 
 def generate_probes(delta: StateChange, obs: Observation, cands: dict[str, CandidateInfo],
                     store: MemoryStoreAdapter, n: int, cfg: dict | None = None) -> list[str]:
-    """One neutral probe about Delta's attribute, then one per candidate (roots/closest hops first, KEEP included),
-    presupposing probes dropped, capped at n."""
+    """One neutral probe about the root fact's current value (first candidate in order if there is no root), then
+    one per candidate (roots/closest hops first, KEEP included), presupposing probes dropped, capped at n.
+    The attribute key is never shown: probes name the subject as the memory text does."""
     cfg = cfg or load_config()
     mems = "\n".join(f"- {m}: {store.get(m).text}" for m in cands)
-    out = llm.try_json(PROBE_PROMPT.format(attribute=delta.attribute.replace("_", " "), memories=mems),
-                       max_tokens=cfg["probe_max_tokens"], cfg=cfg)
     order = sorted(cands, key=lambda m: (not cands[m].is_root, -cands[m].p_dep, int(re.sub(r"\D", "", m) or 0), m))
+    fact = " ".join(store.get(m).text for m in ([m for m in order if cands[m].is_root] or order[:1]))
+    out = llm.try_json(PROBE_PROMPT.format(fact=fact, memories=mems), max_tokens=cfg["probe_max_tokens"], cfg=cfg)
     if (out is None or not str(out.get("change_question") or "").strip()
             or not isinstance(out.get("memory_questions"), dict)):
         llm.fallback("probes", "malformed response; one template probe per candidate")

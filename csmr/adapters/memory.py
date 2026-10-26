@@ -10,7 +10,7 @@ import numpy as np
 
 from csmr import models
 from csmr.adapters.base import MemoryStoreAdapter
-from csmr.types import Memory
+from csmr.types import Memory, same_entity
 
 
 class InMemoryAdapter(MemoryStoreAdapter):
@@ -19,7 +19,7 @@ class InMemoryAdapter(MemoryStoreAdapter):
 
     def all(self, entity: Optional[str] = None, include_revoked: bool = False) -> list[Memory]:
         return [m for m in self._m.values()
-                if (entity is None or m.entity == entity) and (include_revoked or m.status != "revoked")]
+                if (entity is None or same_entity(m.entity, entity)) and (include_revoked or m.status != "revoked")]
 
     def get(self, memory_id: str) -> Memory:
         return self._m[memory_id]

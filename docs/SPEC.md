@@ -41,19 +41,21 @@ Lazy singletons:
 ## 2. Phase A — State-change extraction (`pipeline/extract.py`) — Paper IV-A
 
 ```python
-def extract(obs, known_attributes, cfg, *, related) -> tuple[StateChange | None, dict | None]   # (Δ, note)
-def extract_state_change(obs, known_attributes, cfg=None, *, related=None) -> StateChange | None   # extract(...)[0]
-def find_roots(delta: StateChange, obs: Observation, store) -> list[str]
+def extract(obs, known_attributes, cfg, *, related, known_entities) -> tuple[StateChange | None, dict | None]   # (Δ, note)
+def extract_state_change(obs, known_attributes, cfg=None, *, related=None, known_entities=None) -> StateChange | None   # extract(...)[0]
+def find_roots(delta: StateChange, obs: Observation, store, cfg=None) -> list[str]
 ```
-- One LLM call, JSON mode. The response ALWAYS carries `entity, attribute, statement` (`statement` = third-person restatement of the observation, e.g. "The user sold their car.") and `"state_change": true|false`. When true it also carries `old, new, confidence, change_type` and becomes Δ. When false, Δ is `None` and `{entity, attribute, statement}` is returned as the **note** (`None` if the model omitted any of the three; `Trace.note`). A legacy nested `"state_change": {...}` object is accepted too.
+- One LLM call, JSON mode. The response ALWAYS carries `entity, attribute, statement` (`statement` = third-person restatement of the observation, e.g. "The user sold their car.") and `"state_change": true|false`. When true it also carries `old, new, confidence, change_type, temporary` and becomes Δ. When false, Δ is `None` and `{entity, attribute, statement}` is returned as the **note** (`None` if the model omitted any of the three; `Trace.note`). A legacy nested `"state_change": {...}` object is accepted too.
   A state change needs some stored fact to become false or outdated: adding a new fact compatible with the stored ones is NOT a state change (few-shot from an unrelated domain: "I also enjoy hiking" when memory says "likes swimming" → false).
   `change_type` ∈ {`remove` (fact stops holding with no new value of the same kind: "I cancelled my Netflix subscription", "I stopped going to yoga classes"), `replace` (a new value of the same kind: "I switched my bank account to HDFC", "My favourite team is now Mumbai Indians")} — the prompt carries these as few-shot examples, which must never mirror dev/test scenarios; stored on `StateChange.change_type` (default `replace`).
   Tentative / planned / hedged changes ("might", "planning to") are still extracted, with lower confidence; `null` only when the message changes no stored fact. Weak evidence is judged in Phase C, not here.
   Attribute should be a short snake_case key (e.g. `vehicle_ownership`, `employment`, `residence`).
   The prompt receives `known_attributes` (attribute keys already in the store) and must reuse one when it fits.
+  It also receives `known_entities` (entity names already in the store) and MUST reuse that exact name when the change is about the same subject. Entity names are compared case-insensitively everywhere (`types.same_entity`: roots, candidates, `same_entity` feature, adapter filter).
+  `temporary` (bool, `StateChange.temporary`, default false): true only if the change has a stated end date or duration (few-shot from unrelated domains: "the swimming pool is closed for maintenance until Friday", "I'm off caffeine for two weeks"); only a JSON `true` counts. The temporary flag used downstream is `delta.temporary OR` the `cfg.temporary_patterns` regex on the observation (§5).
   It also receives `related` = texts of the `cfg.extract_context_k` stored memories closest to the observation (the attribute is not known before extraction), and must return `null` when the observation only repeats or confirms them (few-shot from an unrelated domain: yoga).
 - `time`, `source` copied from the observation.
-- Roots = memories with `m.entity == delta.entity` and `m.attribute == delta.attribute`.
+- Roots = memories with `same_entity(m.entity, delta.entity)` and `m.attribute == delta.attribute`.
   Only if that set is empty, fall back to memories with
   `nli(delta.statement, m.text).contradiction >= cfg.root_nli_threshold` (default 0.8).
   (A high-NLI memory alongside an attribute match is a validity dependency, not a root — paper Table II.)
@@ -86,7 +88,7 @@ Features (all in [0,1]):
 | `nli_contra_topical` | nli(delta.statement, cand.text).contradiction × `cos_sim` (NLI contradiction is only meaningful for topically related pairs; unrelated sentences score ≈1 otherwise; falls back to "The {entity}'s {attribute} is now {new}." if statement is empty) |
 | `temporal_after` | cand written after root (1/0), per (root, cand) pair; ISO timestamps compare correctly as strings |
 | `same_source` | 1/0 |
-| `causal_cue` | LLM yes/no (JSON `{"answer": "yes"|"no"}`) → 1/0: "If statement A stopped being true, would statement B likely need to be re-checked or updated? A: {root.text} B: {cand.text} Answer yes or no." |
+| `causal_cue` | graded LLM answer (JSON `{"answer": "yes"|"maybe"|"no"}`) → yes 1.0, maybe 0.5, no 0.0 (by first letter): "Stored fact A: {root.text}. It changed: {delta.statement}. Is statement B now likely FALSE or OUT OF DATE because of this change? Answer one word: yes, maybe, or no. B: {cand.text}". Stricter than "needs re-checking": unrelated facts about the same subject (language, cache) should answer no. |
 | `hop_closeness` | 1.0 hop0, 0.6 hop1, 0.3 hop2 |
 
 For a candidate with multiple roots: P = max over roots. Root itself: P = 1.0.
@@ -95,7 +97,7 @@ Coefficients loaded from `models/dependency.json` if present else `config.yaml: 
 ## 5. Phase C — Evidence (`pipeline/evidence.py`) — Paper IV-C
 
 ```python
-def evidence_features(cand: Memory, delta, obs, info: CandidateInfo, corroboration: int) -> dict[str, float]
+def evidence_features(cand: Memory, delta, obs, info: CandidateInfo, corroboration: int, cfg=None, roots: list[Memory] | None = None) -> dict[str, float]
 def evidence_score(features) -> float            # S(E, m)
 def fit_evidence(X, y) -> None
 ```
@@ -103,9 +105,9 @@ def fit_evidence(X, y) -> None
 |---|---|
 | `source_reliability` | lookup in config: user 0.9, tool 0.8, third_party 0.5, inferred 0.3 |
 | `directness` | 1.0 root, 0.6 hop1, 0.3 hop2 |
-| `contradiction_strength` | nli(delta.statement, cand.text).contradiction |
+| `contradiction_strength` | root: nli(delta.statement, cand.text).contradiction. Non-root: max over roots of nli(root.text, delta.statement).contradiction (premise = root; the reverse direction fails on the small NLI model, which reads "The user sold their car." as ENTAILING "The user owns a car."; a dependent is not contradicted by the change itself, its root is; NLI against the dependent's own text rewards topical overlap). If there are no roots, the candidate's own text is used. Consequence (accepted): non-roots at the same hop share S, so evidence no longer separates them; car_sale M3 becomes REVISE instead of paper Table II's VERIFY. |
 | `not_hedged` | 1 − hedge flag (regex list in config: might, maybe, thinking of, planning to, not sure, probably) |
-| `not_temporary` | 1 − temporary flag (regex: this week, for now, temporarily, until, for a few days) |
+| `not_temporary` | 1 − temporary flag; temporary = `delta.temporary` (extractor, §2) OR `cfg.temporary_patterns` regex on the observation (this week, for now, temporarily, until, for a few days, for a week, at the moment) |
 | `corroboration` | min(count of supporting observations, 3)/3 |
 | `extraction_conf` | delta.confidence |
 | `freshness` | 1.0 if obs.time ≥ cand.time else 0.5 |
@@ -115,20 +117,20 @@ Also expose flags `hedged: bool`, `temporary: bool` on `CandidateInfo` (used by 
 ## 6. Proposed action (`pipeline/actions.py`)
 
 ```python
-def propose_action(mid, info: CandidateInfo, cfg) -> Action
+def propose_action(mid, info: CandidateInfo, cfg, change_type="replace") -> Action
 def revise_text(mem: Memory, delta, obs) -> str          # one LLM call
 def condition_text(mem: Memory, delta, obs) -> str       # one LLM call
 ```
 Rule (encodes Section V constraints):
 ```
 if mid not in C:                                   KEEP
+elif P >= τd and info.temporary:                   CONDITIONAL   (checked first; roots included, P = 1)
 elif is_root and S >= τe:                          REVOKE if delta.change_type == "remove" else REVISE
 elif P >= τd and S >= τe:                          REVISE   (any modified non-root)
-elif P >= τd and info.temporary:                   CONDITIONAL
 elif P >= τd:                                      VERIFY
 else:                                              KEEP
 ```
-REVISE text must preserve history-compatible meaning, e.g. "The user previously drove to work by car; current commute mode unknown after selling the car (as of {date})." Prompts (REVISE, CONDITIONAL, judge) receive the observation date `obs.time[:10]` only, never the time of day, so identical input on the same day hits the LLM cache.
+REVISE text: ONE short sentence, third person, present tense, stating the CURRENT state first, with the old value only in brackets at the end; no date. Root + replace: "The ShopKart backend uses MongoDB Atlas (migrated from PostgreSQL 15)." Dependent whose current value is unknown: "ShopKart's current schema-migration method is unknown (it used Alembic before the move to MongoDB)." The prompt's own few-shot examples come from an unrelated domain (blog moved from WordPress to Ghost), never from dev/test/showcase scenarios. Prompts (REVISE, CONDITIONAL, judge) receive the observation date `obs.time[:10]` only, never the time of day, so identical input on the same day hits the LLM cache.
 
 ## 7. Phase D — Repair sets (`pipeline/repair_sets.py`) — Paper IV-D
 
@@ -163,18 +165,20 @@ Retrieve top-k by cosine to the question from the given memory list; LLM answers
 ## 10. Counterfactual selection (`pipeline/counterfactual.py`) — Paper IV-D, V
 
 ```python
-def generate_probes(delta, obs, cands, store, n: int) -> list[str]   # LLM; from Δ and candidates ONLY
+def generate_probes(delta, obs, cands, store, n: int) -> list[str]   # LLM; from candidate memory texts ONLY
 # NEUTRAL questions about the user's CURRENT state ("How does the user commute to work?"), never mentioning or presupposing the change.
-# One about Δ's attribute, then one per candidate (KEEP-proposed included, so over-repair is detectable), roots first, then by P_dep descending, ties by numeric memory id (never string order: "M12" must not outrank "M2"); capped at n (config n_probes=6).
+# One "change_question" about the CURRENT value of the root fact (root memory text(s); the first candidate in order if there is no root), then one per candidate (KEEP-proposed included, so over-repair is detectable), roots first, then by P_dep descending, ties by numeric memory id (never string order: "M12" must not outrank "M2"); capped at n (config n_probes=6).
 # Probes using a word only the observation introduces (e.g. "sold") are dropped.
 def judge(answer: str, question: str, delta, obs, cfg) -> dict       # ONE call, two explicit steps:
 # {"determined_by_change": bool, "verdict": "consistent"|"vague"|"contradicts"} -> score 1.0 / 0.5 / 0.0
 #   determined_by_change=false: "unknown"/uncertain answers are consistent (1.0)
 #   determined_by_change=true:  "unknown"/vague is vague (0.5)
+#   Only claims about the CURRENT state can contradict: mentioning an old value explicitly as past/previous ("used Alembic before; current method unknown") is NOT asserting it.
 #   An answer asserting something the change makes false OR likely outdated is "contradicts" (0.0) whatever determined_by_change is (e.g. "drives to work every day: Yes" after "sold their car"). determined_by_change only decides how unknown-like answers score.
 # Unknown-like answers (empty, or matching cfg.unknown_patterns when <= cfg.unknown_max_words words, or when the answer starts with a pattern) get the verdict IN CODE: consistent (1.0) if determined_by_change is false, vague (0.5) if true.
 #   The LLM verdict field is used only for answers that make a claim.
 # Probes are always third person ("the user"), never "you".
+# Probes name the specific subject as the memory text does (e.g. "ShopKart"), never a generic stand-in; the attribute key is never shown to the probe prompt.
 # Both fields are stored per probe and per repair set in the trace ("judgements").
 def score(rs, ...) -> dict  # {"benefit","collateral","evidence_cost","size","total"}
 def select(repair_sets, ...) -> tuple[RepairSet, list[dict]]

@@ -29,15 +29,24 @@ def _matches(patterns: list[str], text: str) -> bool:
 
 
 def evidence_features(cand: Memory, delta: StateChange, obs: Observation, info: CandidateInfo,
-                      corroboration: int = 1, cfg: dict | None = None) -> dict[str, float]:
-    """Paper IV-C feature vector for (observation, cand); also sets info.hedged / info.temporary."""
+                      corroboration: int = 1, cfg: dict | None = None,
+                      roots: list[Memory] | None = None) -> dict[str, float]:
+    """Paper IV-C feature vector for (observation, cand); also sets info.hedged / info.temporary.
+    A dependent is not contradicted by the change itself, its root is: so for a non-root, contradiction_strength
+    = max over roots of NLI(premise root.text, hypothesis Δ.statement) (this direction: the small NLI model reads
+    "sold their car" as entailing "owns a car"); directness still discounts it by hop."""
     cfg = cfg or load_config()
     info.hedged = _matches(cfg["hedge_patterns"], obs.text)
-    info.temporary = _matches(cfg["temporary_patterns"], obs.text)
+    info.temporary = delta.temporary or _matches(cfg["temporary_patterns"], obs.text)
+    stmt = delta.statement or delta.as_sentence()
+    if info.is_root or not roots:
+        contra = models.nli(stmt, cand.text)["contradiction"]
+    else:
+        contra = max(models.nli(r.text, stmt)["contradiction"] for r in roots)
     return {
         "source_reliability": cfg["source_reliability"].get(delta.source, cfg["source_reliability_default"]),
         "directness": cfg["directness"].get(info.hop, cfg["hop_default"]),
-        "contradiction_strength": models.nli(delta.statement or delta.as_sentence(), cand.text)["contradiction"],
+        "contradiction_strength": contra,
         "not_hedged": float(not info.hedged),
         "not_temporary": float(not info.temporary),
         "corroboration": min(corroboration, cfg["corroboration_cap"]) / cfg["corroboration_cap"],
@@ -59,8 +68,9 @@ def assess_evidence(cands: dict[str, CandidateInfo], store: MemoryStoreAdapter, 
     cfg = cfg or load_config()
     use = cfg["ablation"]["use_evidence"]
     mems = {m.id: m for m in store.all()}
+    roots = [mems[i] for i, c in cands.items() if c.is_root]
     for mid, info in cands.items():
-        info.ev_features = evidence_features(mems[mid], delta, obs, info, cfg=cfg)
+        info.ev_features = evidence_features(mems[mid], delta, obs, info, cfg=cfg, roots=roots)
         info.s_evidence = evidence_score(info.ev_features, cfg) if use else 1.0
 
 

@@ -5,9 +5,14 @@ from csmr import llm
 from csmr.config import load_config
 from csmr.types import Action, CandidateInfo, Memory, Observation, StateChange
 
-REVISE_PROMPT = """A stored memory may be outdated because of a new observation. Rewrite the memory so it stays
-true: keep what was true before (as past), and say what is now unknown or changed. One sentence, third person.
-Example: "The user previously drove to work by car; current commute mode unknown after selling the car (as of 2026-06-01)."
+# Examples must never mirror dev/test/showcase scenarios.
+REVISE_PROMPT = """A stored memory may be outdated because of a new observation. Rewrite it as ONE short sentence,
+third person, present tense, that states the CURRENT state first; put the old value only in brackets at the end.
+If the current value is not known from the observation, say it is unknown. Do not include any date.
+Examples:
+- the fact itself changed: "The user's blog is hosted on Ghost (moved from WordPress)."
+- a fact that depended on it, new value unknown: "The user's current blog theme is unknown (it used the Astra theme
+  before the move to Ghost)."
 
 Memory: "{memory}"
 New observation ({time}): "{obs}"
@@ -31,12 +36,12 @@ def propose_action(mid: str, info: CandidateInfo | None, cfg: dict, change_type:
         return Action.KEEP
     strong = info.s_evidence >= cfg["tau_e"]
     dependent = info.p_dep >= cfg["tau_d"]
+    if dependent and info.temporary:  # before REVISE/REVOKE, roots included (P_dep = 1)
+        return Action.CONDITIONAL
     if info.is_root and strong:
         return Action.REVOKE if change_type == "remove" else Action.REVISE
     if dependent and strong:
         return Action.REVISE
-    if dependent and info.temporary:
-        return Action.CONDITIONAL
     return Action.VERIFY if dependent else Action.KEEP
 
 

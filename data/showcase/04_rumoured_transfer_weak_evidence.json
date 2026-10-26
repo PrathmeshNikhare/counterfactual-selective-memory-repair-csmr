@@ -1,0 +1,38 @@
+{
+  "id": "showcase_rumoured_transfer",
+  "category": "weak_evidence",
+  "domain": "workplace_assistant",
+  "note": "Workplace assistant. The user relays an unconfirmed, second-hand hint about a team move. Nothing may be revised or revoked; at most the office location is flagged for verification. Shows the evidence constraint protecting memory from rumours.",
+  "memories": [
+    {"id": "M1", "text": "The user works at Thoughtline's Bengaluru office on the payments platform team.", "entity": "user", "attribute": "work_location", "time": "2025-07-01T10:00:00", "source": "user"},
+    {"id": "M2", "text": "The user commutes to the office by the company shuttle from HSR Layout.", "entity": "user", "attribute": "commute", "time": "2025-07-08T09:00:00", "source": "user"},
+    {"id": "M3", "text": "The user has an 11-month lease on a flat in HSR Layout that ends in March 2027.", "entity": "user", "attribute": "residence", "time": "2026-04-01T18:00:00", "source": "user"},
+    {"id": "M4", "text": "The user plays in a weekend cricket league in Bengaluru.", "entity": "user", "attribute": "hobby", "time": "2026-05-10T07:00:00", "source": "user"},
+    {"id": "M5", "text": "The user's manager is Kavya Nair.", "entity": "user", "attribute": "manager", "time": "2025-07-01T10:05:00", "source": "user"},
+    {"id": "M6", "text": "The user builds payment reconciliation services in Java and Kafka.", "entity": "user", "attribute": "work_tech", "time": "2025-08-15T14:00:00", "source": "user"},
+    {"id": "M7", "text": "The user works from the office on Tuesdays, Wednesdays and Thursdays.", "entity": "user", "attribute": "work_schedule", "time": "2026-01-12T09:00:00", "source": "user"},
+    {"id": "M8", "text": "The user's partner works at a hospital in Bengaluru.", "entity": "user", "attribute": "family", "time": "2026-02-14T20:00:00", "source": "user"},
+    {"id": "M9", "text": "The user is on call for the payments platform one week in every five.", "entity": "user", "attribute": "on_call", "time": "2026-03-02T10:00:00", "source": "user"},
+    {"id": "M10", "text": "The user is aiming for a promotion to senior engineer in the next review cycle.", "entity": "user", "attribute": "career_goal", "time": "2026-06-20T19:00:00", "source": "user"},
+    {"id": "M11", "text": "The user enjoys trekking in the Western Ghats during the monsoon.", "entity": "user", "attribute": "travel_hobby", "time": "2026-07-05T21:00:00", "source": "user"},
+    {"id": "M12", "text": "The user is vegetarian.", "entity": "user", "attribute": "diet", "time": "2025-09-01T13:00:00", "source": "user"},
+    {"id": "M13", "text": "The user prefers async updates on Slack over status meetings.", "entity": "user", "attribute": "work_preference", "time": "2026-02-01T11:00:00", "source": "user"},
+    {"id": "M14", "text": "The user is reading 'Designing Data-Intensive Applications'.", "entity": "user", "attribute": "reading", "time": "2026-08-22T22:00:00", "source": "user"},
+    {"id": "M15", "text": "The user's laptop is a MacBook Pro issued by Thoughtline.", "entity": "user", "attribute": "devices", "time": "2025-07-01T10:10:00", "source": "user"}
+  ],
+  "observation": {"text": "My manager hinted that our whole team might be moved to the Hyderabad office next quarter, but nothing is confirmed yet.", "source": "user", "time": "2026-10-23T19:15:00"},
+  "gold": {
+    "actions": {
+      "M1": "VERIFY", "M2": "KEEP", "M3": "KEEP", "M4": "KEEP", "M5": "KEEP", "M6": "KEEP",
+      "M7": "KEEP", "M8": "KEEP", "M9": "KEEP", "M10": "KEEP", "M11": "KEEP", "M12": "KEEP",
+      "M13": "KEEP", "M14": "KEEP", "M15": "KEEP"
+    },
+    "dependencies": [["M1", "M2"], ["M1", "M7"]],
+    "eval_questions": [
+      {"q": "Which office does the user work at?", "gold_answer": "Thoughtline's Bengaluru office (a possible move to Hyderabad is unconfirmed).", "depends_on": ["M1"]},
+      {"q": "How does the user commute to work?", "gold_answer": "By the company shuttle from HSR Layout.", "depends_on": ["M2"]},
+      {"q": "Where does the user live?", "gold_answer": "In a leased flat in HSR Layout, Bengaluru.", "depends_on": ["M3"]},
+      {"q": "Who is the user's manager?", "gold_answer": "Kavya Nair.", "depends_on": ["M5"]}
+    ]
+  }
+}

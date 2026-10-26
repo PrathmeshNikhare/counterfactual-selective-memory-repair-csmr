@@ -55,7 +55,7 @@ def _cue(monkeypatch, fn):
     return f["causal_cue"]
 
 
-@pytest.mark.parametrize("bad", [{}, {"answer": ""}, {"answer": "maybe"}])
+@pytest.mark.parametrize("bad", [{}, {"answer": ""}, {"answer": "perhaps"}])
 def test_malformed_cue_retries_once_then_no(monkeypatch, bad):
     prompts = []
     assert _cue(monkeypatch, lambda p, **k: prompts.append(p) or bad) == 0.0
@@ -96,3 +96,10 @@ def test_temporal_after_is_per_root_pair(monkeypatch):
     tf = lambda root, cand: dependency.dependency_features(root, cand, d, sc.observation, info)["temporal_after"]
     m6 = store.get("M6")  # 2026-03-02
     assert (tf(store.get("M1"), m6), tf(newer_root, m6)) == (1.0, 0.0)
+
+
+@pytest.mark.parametrize("ans,cue", [("yes", 1.0), ("Maybe", 0.5), ("no", 0.0)])
+def test_cue_is_graded_and_asks_about_the_change(monkeypatch, ans, cue):
+    prompts = []
+    assert _cue(monkeypatch, lambda p, **k: prompts.append(p) or {"answer": ans}) == cue
+    assert "It changed: The user sold their car." in prompts[0] and "FALSE or OUT OF DATE" in prompts[0]

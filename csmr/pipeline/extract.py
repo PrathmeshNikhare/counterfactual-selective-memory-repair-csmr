@@ -4,7 +4,7 @@ from __future__ import annotations
 from csmr import llm, models
 from csmr.adapters.base import MemoryStoreAdapter
 from csmr.config import load_config
-from csmr.types import Observation, StateChange
+from csmr.types import Observation, StateChange, same_entity
 
 # Few-shot examples must never mirror dev/test scenarios (no cars, bikes, jobs, cities, pets, phones).
 EXTRACT_PROMPT = """You read one observation from a user talking to an assistant and decide whether it
@@ -14,6 +14,9 @@ Observation: "{text}"
 
 Attribute keys already used in memory: {known}
 Reuse one of those keys if it fits; otherwise invent a short snake_case key (e.g. vehicle_ownership, employment, residence).
+
+Entity names already used in memory: {entities}
+If the change is about one of those subjects, "entity" MUST be that exact name; invent a new one only for a new subject.
 
 Stored memories most similar to the observation:
 {related}
@@ -42,8 +45,9 @@ Tentative, planned or hedged changes ("might", "planning to", "not sure") that w
 outdated MUST still be extracted, with a lower confidence; judging how weak the evidence is is not your job.
 
 If "state_change" is true, also return:
-"old" (previous value or null), "new" (new value), "confidence" (0..1, lower if hedged/uncertain) and
-"change_type" ("remove" or "replace").
+"old" (previous value or null), "new" (new value), "confidence" (0..1, lower if hedged/uncertain),
+"change_type" ("remove" or "replace") and "temporary" (true only if the change has a stated end date or duration,
+e.g. "the swimming pool is closed for maintenance until Friday", "I'm off caffeine for two weeks"; else false).
 change_type:
 - "remove" = the fact stops holding with no new value of the same kind
   (I cancelled my Netflix subscription, I stopped going to yoga classes)
@@ -52,12 +56,15 @@ change_type:
 
 
 def extract(obs: Observation, known_attributes: list[str], cfg: dict | None = None, *,
-            related: list[str] | None = None) -> tuple[StateChange | None, dict | None]:
+            related: list[str] | None = None, known_entities: list[str] | None = None
+            ) -> tuple[StateChange | None, dict | None]:
     """Paper IV-A: Δ = (entity, attribute, old, new, time, source, confidence). One LLM call.
     `related` = texts of the stored memories closest to the observation, so a confirmation can be told from a change.
+    `known_entities` = entity names already in the store; the model must reuse one when the change is about it.
     Returns (Δ or None, note); note = {entity, attribute, statement} for storing a no-change message (None if the
     model omitted any of them)."""
     prompt = EXTRACT_PROMPT.format(text=obs.text, known=sorted(set(known_attributes)) or "none",
+                                   entities=sorted(set(known_entities or [])) or "none",
                                    related="\n".join(f"- {t}" for t in related or []) or "(none)")
     cfg = cfg or load_config()
     out = llm.try_json(prompt, max_tokens=cfg["extract_max_tokens"], cfg=cfg)
@@ -72,25 +79,29 @@ def extract(obs: Observation, known_attributes: list[str], cfg: dict | None = No
     if not sc:
         return None, note
     try:
+        if not isinstance(out.get("entity"), str) or not out["entity"].strip():  # same_entity() needs a string
+            raise ValueError("entity")
         return StateChange(entity=out["entity"], attribute=out["attribute"], old=out.get("old"), new=str(out["new"]),
                            time=obs.time, source=obs.source, confidence=float(out["confidence"]),
                            statement=out.get("statement") or obs.text,
-                           change_type="remove" if out.get("change_type") == "remove" else "replace"), note
+                           change_type="remove" if out.get("change_type") == "remove" else "replace",
+                           temporary=out.get("temporary") is True), note
     except (KeyError, TypeError, ValueError, AttributeError):
         llm.fallback("extract", f"missing/invalid fields in {out!r}; treated as no state change")
         return None, note
 
 
 def extract_state_change(obs: Observation, known_attributes: list[str], cfg: dict | None = None, *,
-                         related: list[str] | None = None) -> StateChange | None:
+                         related: list[str] | None = None, known_entities: list[str] | None = None
+                         ) -> StateChange | None:
     """Δ only (see `extract`)."""
-    return extract(obs, known_attributes, cfg, related=related)[0]
+    return extract(obs, known_attributes, cfg, related=related, known_entities=known_entities)[0]
 
 
 def find_roots(delta: StateChange, obs: Observation, store: MemoryStoreAdapter, cfg: dict | None = None) -> list[str]:
     """Paper IV-A: same (entity, attribute); only if none, fall back to NLI contradiction(Δ.statement, m.text) >= threshold."""
     ms = store.all()
-    roots = [m.id for m in ms if m.entity == delta.entity and m.attribute == delta.attribute]
+    roots = [m.id for m in ms if same_entity(m.entity, delta.entity) and m.attribute == delta.attribute]
     if roots:
         return roots
     thr = (cfg or load_config())["root_nli_threshold"]

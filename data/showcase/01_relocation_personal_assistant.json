@@ -1,0 +1,46 @@
+{
+  "id": "showcase_relocation",
+  "category": "one_hop",
+  "domain": "personal_assistant",
+  "note": "Personal assistant. The user relocates cities. Location-bound memories must be repaired; city-flavoured but location-independent memories (football club, parents' city, remote job) must stay.",
+  "memories": [
+    {"id": "M1", "text": "The user lives in a rented 1BHK in Koramangala, Bangalore.", "entity": "user", "attribute": "residence", "time": "2026-02-03T10:00:00", "source": "user"},
+    {"id": "M2", "text": "The user has a gym membership at Cult.fit Koramangala and trains there on weekday mornings.", "entity": "user", "attribute": "gym", "time": "2026-02-10T08:00:00", "source": "user"},
+    {"id": "M3", "text": "The user's family doctor is Dr. Rao at a clinic in Indiranagar, Bangalore.", "entity": "user", "attribute": "doctor", "time": "2026-02-18T12:00:00", "source": "user"},
+    {"id": "M4", "text": "The user runs around Agara Lake every Sunday morning.", "entity": "user", "attribute": "weekend_routine", "time": "2026-03-01T07:00:00", "source": "user"},
+    {"id": "M5", "text": "The user pays Rs 28,000 per month as rent for the Koramangala flat.", "entity": "user", "attribute": "rent", "time": "2026-03-05T19:00:00", "source": "user"},
+    {"id": "M6", "text": "The user works remotely as a backend engineer for a US-based fintech startup.", "entity": "user", "attribute": "employment", "time": "2026-01-20T11:00:00", "source": "user"},
+    {"id": "M7", "text": "The user's working hours overlap with US Pacific time, so they usually work late evenings.", "entity": "user", "attribute": "work_schedule", "time": "2026-01-22T21:00:00", "source": "user"},
+    {"id": "M8", "text": "The user's parents live in Mysuru.", "entity": "user", "attribute": "family", "time": "2026-01-15T10:00:00", "source": "user"},
+    {"id": "M9", "text": "The user takes the KSRTC bus from Bangalore to Mysuru to visit their parents every other weekend.", "entity": "user", "attribute": "family_visits", "time": "2026-04-12T18:00:00", "source": "user"},
+    {"id": "M10", "text": "The user supports Bengaluru FC in the Indian Super League.", "entity": "user", "attribute": "sports_team", "time": "2026-03-20T20:00:00", "source": "user"},
+    {"id": "M11", "text": "The user prefers a South Indian breakfast, usually idli or dosa.", "entity": "user", "attribute": "food_preference", "time": "2026-02-25T09:00:00", "source": "user"},
+    {"id": "M12", "text": "The user's favourite science-fiction author is Liu Cixin.", "entity": "user", "attribute": "reading", "time": "2026-05-02T22:00:00", "source": "user"},
+    {"id": "M13", "text": "The user works on a ThinkPad X1 Carbon laptop.", "entity": "user", "attribute": "devices", "time": "2026-01-25T10:00:00", "source": "user"},
+    {"id": "M14", "text": "The user's younger sister is studying computer science at IIT Madras.", "entity": "user", "attribute": "family_sister", "time": "2026-03-11T16:00:00", "source": "user"},
+    {"id": "M15", "text": "The user is saving for a two-week trip to Japan in spring 2027.", "entity": "user", "attribute": "travel_plans", "time": "2026-06-08T21:00:00", "source": "user"},
+    {"id": "M16", "text": "The user prefers window seats on flights.", "entity": "user", "attribute": "travel_preference", "time": "2026-06-08T21:05:00", "source": "user"},
+    {"id": "M17", "text": "The user drinks black coffee without sugar.", "entity": "user", "attribute": "drink_preference", "time": "2026-02-26T09:00:00", "source": "user"},
+    {"id": "M18", "text": "The user plays online chess in the evenings and is rated around 1600.", "entity": "user", "attribute": "hobby", "time": "2026-07-14T22:00:00", "source": "user"},
+    {"id": "M19", "text": "The user is learning to play the keyboard using an online course.", "entity": "user", "attribute": "learning", "time": "2026-08-03T20:00:00", "source": "user"},
+    {"id": "M20", "text": "The user dislikes horror movies.", "entity": "user", "attribute": "movie_preference", "time": "2026-08-19T23:00:00", "source": "user"}
+  ],
+  "observation": {"text": "Big update: I've moved from Bangalore to Pune. I'm renting a flat in Baner now.", "source": "user", "time": "2026-10-22T18:30:00"},
+  "gold": {
+    "actions": {
+      "M1": "REVISE", "M2": "REVISE", "M3": "VERIFY", "M4": "REVISE", "M5": "REVISE",
+      "M6": "KEEP", "M7": "KEEP", "M8": "KEEP", "M9": "REVISE", "M10": "KEEP",
+      "M11": "KEEP", "M12": "KEEP", "M13": "KEEP", "M14": "KEEP", "M15": "KEEP",
+      "M16": "KEEP", "M17": "KEEP", "M18": "KEEP", "M19": "KEEP", "M20": "KEEP"
+    },
+    "dependencies": [["M1", "M2"], ["M1", "M3"], ["M1", "M4"], ["M1", "M5"], ["M1", "M9"]],
+    "eval_questions": [
+      {"q": "Where does the user live?", "gold_answer": "In a rented flat in Baner, Pune.", "depends_on": ["M1"]},
+      {"q": "Where does the user go to the gym?", "gold_answer": "Unknown; the Cult.fit Koramangala membership no longer applies after moving to Pune.", "depends_on": ["M2"]},
+      {"q": "How much rent does the user pay?", "gold_answer": "Unknown; the Rs 28,000 Koramangala rent no longer applies.", "depends_on": ["M5"]},
+      {"q": "How does the user travel to visit their parents?", "gold_answer": "Unknown; the Bangalore-to-Mysuru bus no longer applies since they now live in Pune.", "depends_on": ["M9"]},
+      {"q": "What does the user do for work?", "gold_answer": "Remote backend engineer for a US-based fintech startup.", "depends_on": ["M6"]},
+      {"q": "Which football club does the user support?", "gold_answer": "Bengaluru FC.", "depends_on": ["M10"]}
+    ]
+  }
+}

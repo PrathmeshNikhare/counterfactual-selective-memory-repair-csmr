@@ -1,0 +1,38 @@
+{
+  "id": "showcase_client_trip",
+  "category": "temporary_change",
+  "domain": "scheduling_assistant",
+  "note": "Scheduling assistant. A three-week work trip abroad is a temporary change: time-zone and location-bound routines become CONDITIONAL, while the home address and long-term facts must not be overwritten.",
+  "memories": [
+    {"id": "M1", "text": "The user is based in Pune and works on India Standard Time.", "entity": "user", "attribute": "location", "time": "2026-01-05T10:00:00", "source": "user"},
+    {"id": "M2", "text": "The user prefers meetings to be scheduled between 10:00 and 18:00 IST.", "entity": "user", "attribute": "meeting_hours", "time": "2026-01-06T10:00:00", "source": "user"},
+    {"id": "M3", "text": "The user goes to the gym near their home in Kothrud at 7 every morning.", "entity": "user", "attribute": "gym_routine", "time": "2026-02-01T07:00:00", "source": "user"},
+    {"id": "M4", "text": "The user plays badminton with friends in Pune every Saturday evening.", "entity": "user", "attribute": "weekend_routine", "time": "2026-03-07T19:00:00", "source": "user"},
+    {"id": "M5", "text": "The user's home is an apartment in Kothrud, Pune.", "entity": "user", "attribute": "residence", "time": "2026-01-05T10:05:00", "source": "user"},
+    {"id": "M6", "text": "The user is a data analytics consultant at Zenith Analytics.", "entity": "user", "attribute": "employment", "time": "2026-01-05T10:10:00", "source": "user"},
+    {"id": "M7", "text": "The user is vegetarian.", "entity": "user", "attribute": "diet", "time": "2026-01-20T13:00:00", "source": "user"},
+    {"id": "M8", "text": "The user prefers aisle seats on flights.", "entity": "user", "attribute": "travel_preference", "time": "2026-04-18T21:00:00", "source": "user"},
+    {"id": "M9", "text": "The user calls their parents every Sunday at 8 pm IST.", "entity": "user", "attribute": "family_routine", "time": "2026-02-08T20:00:00", "source": "user"},
+    {"id": "M10", "text": "The user's main client this year is a retail chain called FreshMart.", "entity": "user", "attribute": "client", "time": "2026-05-04T11:00:00", "source": "user"},
+    {"id": "M11", "text": "The user prefers to block 9 to 10 am for deep work with no meetings.", "entity": "user", "attribute": "focus_time", "time": "2026-03-15T09:00:00", "source": "user"},
+    {"id": "M12", "text": "The user is learning Spanish on Duolingo.", "entity": "user", "attribute": "learning", "time": "2026-06-11T22:00:00", "source": "user"},
+    {"id": "M13", "text": "The user's favourite cuisine is Thai.", "entity": "user", "attribute": "food_preference", "time": "2026-07-02T20:00:00", "source": "user"},
+    {"id": "M14", "text": "The user uses Google Calendar for all scheduling.", "entity": "user", "attribute": "tools", "time": "2026-01-06T10:05:00", "source": "user"},
+    {"id": "M15", "text": "The user has a cat named Biscuit, looked after by a neighbour when the user travels.", "entity": "user", "attribute": "pets", "time": "2026-04-30T18:00:00", "source": "user"}
+  ],
+  "observation": {"text": "Heads up: I'll be in Singapore for a client project from 3 to 21 November, so I'll be working on Singapore time for those three weeks.", "source": "user", "time": "2026-10-24T16:00:00"},
+  "gold": {
+    "actions": {
+      "M1": "CONDITIONAL", "M2": "CONDITIONAL", "M3": "CONDITIONAL", "M4": "CONDITIONAL", "M5": "KEEP",
+      "M6": "KEEP", "M7": "KEEP", "M8": "KEEP", "M9": "KEEP", "M10": "KEEP", "M11": "KEEP",
+      "M12": "KEEP", "M13": "KEEP", "M14": "KEEP", "M15": "KEEP"
+    },
+    "dependencies": [["M1", "M2"], ["M1", "M3"], ["M1", "M4"]],
+    "eval_questions": [
+      {"q": "Which time zone will the user be working in during mid-November?", "gold_answer": "Singapore time (3 to 21 November); otherwise IST.", "depends_on": ["M1"]},
+      {"q": "When should meetings be scheduled for the user on 10 November?", "gold_answer": "During the user's Singapore working hours, not the usual 10:00-18:00 IST window.", "depends_on": ["M2"]},
+      {"q": "Where is the user's home?", "gold_answer": "An apartment in Kothrud, Pune.", "depends_on": ["M5"]},
+      {"q": "Who does the user work for?", "gold_answer": "Zenith Analytics, as a data analytics consultant.", "depends_on": ["M6"]}
+    ]
+  }
+}

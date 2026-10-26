@@ -25,8 +25,10 @@ def test_observe_retrieve_pending(monkeypatch):
     assert t.chosen == "R2" and api.store.get("M1").status == "revoked"
     got = api.retrieve("car", k=10)
     assert len(got) == len(api.store.all()) and not any(x == api.store.get("M1").text for x in got)
-    assert [m.id for m in api.pending_verifications()] == ["M3"]
-    assert any(x.startswith("[unverified]") for x in got)
+    assert api.pending_verifications() == []  # M3 is REVISE'd (Spec 5), nothing left to verify
+    api.store.update("M4", status="pending_verify")
+    assert [m.id for m in api.pending_verifications()] == ["M4"]
+    assert any(x.startswith("[unverified]") for x in api.retrieve("car", k=10))
 
 
 def test_observe_defaults_time(monkeypatch):

@@ -9,12 +9,14 @@ import numpy as np
 from csmr import llm, models
 from csmr.adapters.base import MemoryStoreAdapter
 from csmr.config import ROOT, load_config
-from csmr.types import CandidateInfo, Memory, Observation, StateChange
+from csmr.types import CandidateInfo, Memory, Observation, StateChange, same_entity
 
-CAUSAL_PROMPT = """If statement A stopped being true, would statement B likely need to be re-checked or updated?
-A: {a}
+CAUSAL_PROMPT = """Stored fact A: {a}
+It changed: {change}
+Is statement B now likely FALSE or OUT OF DATE because of this change? Answer one word: yes, maybe, or no.
 B: {b}
-Answer yes or no. Return JSON only: {{"answer": "yes" or "no"}}"""
+Return JSON only: {{"answer": "yes" | "maybe" | "no"}}"""
+CUE_SCORE = {"y": 1.0, "m": 0.5, "n": 0.0}  # yes / maybe / no, keyed by first letter
 
 FEATURES = ["cos_sim", "same_entity", "same_attribute", "nli_entail", "nli_contra_topical", "temporal_after",
             "same_source", "causal_cue", "hop_closeness"]
@@ -33,8 +35,9 @@ def dependency_features(root: Memory, cand: Memory, delta: StateChange, obs: Obs
     """Paper IV-C feature vector z for the pair (root, cand); all values in [0, 1]."""
     cfg = cfg or load_config()
     a, b = models.embed([root.text, cand.text])
-    cue = llm.try_json_valid(CAUSAL_PROMPT.format(a=root.text, b=cand.text),
-                             lambda o: str(o.get("answer", "")).strip().lower()[:1] in ("y", "n"),
+    stmt = delta.statement or delta.as_sentence()
+    cue = llm.try_json_valid(CAUSAL_PROMPT.format(a=root.text, change=stmt, b=cand.text),
+                             lambda o: str(o.get("answer", "")).strip().lower()[:1] in CUE_SCORE,
                              max_tokens=cfg["cue_max_tokens"], cfg=cfg)
     if cue is None:
         llm.fallback("causal_cue", f"malformed response for {cand.id}; cue = no")
@@ -42,14 +45,14 @@ def dependency_features(root: Memory, cand: Memory, delta: StateChange, obs: Obs
     cos = max(0.0, float(a @ b))
     return {
         "cos_sim": cos,
-        "same_entity": float(root.entity == cand.entity),
+        "same_entity": float(same_entity(root.entity, cand.entity)),
         "same_attribute": float(root.attribute == cand.attribute),
         "nli_entail": models.nli(root.text, cand.text)["entailment"],
         # NLI calls unrelated sentences "contradictions"; only meaningful for topically related pairs
-        "nli_contra_topical": models.nli(delta.statement or delta.as_sentence(), cand.text)["contradiction"] * cos,
+        "nli_contra_topical": models.nli(stmt, cand.text)["contradiction"] * cos,
         "temporal_after": float(cand.time > root.time),
         "same_source": float(root.source == cand.source),
-        "causal_cue": float(str(cue["answer"]).strip().lower().startswith("y")),
+        "causal_cue": CUE_SCORE[str(cue["answer"]).strip().lower()[0]],
         "hop_closeness": cfg["hop_closeness"].get(info.hop, cfg["hop_default"]),
     }
 

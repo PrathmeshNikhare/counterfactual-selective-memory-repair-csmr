@@ -55,9 +55,15 @@ class StateChange:
     confidence: float
     statement: str = ""  # third-person restatement of the observation, e.g. "The user sold their car."
     change_type: str = "replace"  # "remove" (fact no longer holds) | "replace" (fact has a new value)
+    temporary: bool = False  # extractor flag: the change has a stated end date or duration
 
     def as_sentence(self) -> str:
         return f"The {self.entity}'s {self.attribute.replace('_', ' ')} is now {self.new}."
+
+
+def same_entity(a: str, b: str) -> bool:
+    """Entity names are compared case-insensitively everywhere ("ShopKart" == "shopkart")."""
+    return a.casefold() == b.casefold()
 
 
 @dataclass

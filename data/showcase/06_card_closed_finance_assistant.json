@@ -1,0 +1,40 @@
+{
+  "id": "showcase_card_closed",
+  "category": "false_similarity",
+  "domain": "finance_assistant",
+  "note": "Personal-finance assistant. The user closes one credit card. Things billed to or tied to that card must be repaired, but the same bank's savings account and home loan, and a different credit card, are lexically similar and must stay untouched.",
+  "memories": [
+    {"id": "M1", "text": "The user has an HDFC Regalia credit card.", "entity": "user", "attribute": "credit_card", "time": "2025-06-10T10:00:00", "source": "user"},
+    {"id": "M2", "text": "The user's Netflix and Spotify subscriptions are charged to the HDFC Regalia credit card.", "entity": "user", "attribute": "subscriptions_payment", "time": "2025-09-02T21:00:00", "source": "user"},
+    {"id": "M3", "text": "The user is collecting Regalia reward points to redeem for flights to Japan.", "entity": "user", "attribute": "rewards_goal", "time": "2026-03-18T22:00:00", "source": "user"},
+    {"id": "M4", "text": "The Regalia card bill is paid on the 5th of each month by auto-debit from the user's savings account.", "entity": "user", "attribute": "card_bill_payment", "time": "2025-07-01T10:00:00", "source": "user"},
+    {"id": "M5", "text": "The user's salary is credited to their HDFC Bank savings account.", "entity": "user", "attribute": "salary_account", "time": "2025-04-01T10:00:00", "source": "user"},
+    {"id": "M6", "text": "The user has a home loan with HDFC Bank, with the EMI due on the 10th of each month.", "entity": "user", "attribute": "home_loan", "time": "2025-12-15T11:00:00", "source": "user"},
+    {"id": "M7", "text": "The user also has an SBI Cashback credit card that they use for online shopping.", "entity": "user", "attribute": "credit_card_secondary", "time": "2026-01-22T19:00:00", "source": "user"},
+    {"id": "M8", "text": "The user prefers paying by UPI for small everyday purchases.", "entity": "user", "attribute": "payment_preference", "time": "2025-08-14T18:00:00", "source": "user"},
+    {"id": "M9", "text": "The user tracks monthly spending in a Google Sheet.", "entity": "user", "attribute": "budgeting_tool", "time": "2025-10-01T21:00:00", "source": "user"},
+    {"id": "M10", "text": "The user's dining-out budget is Rs 6,000 per month.", "entity": "user", "attribute": "dining_budget", "time": "2026-02-01T20:00:00", "source": "user"},
+    {"id": "M11", "text": "The user invests in a Nifty 50 index fund through a monthly SIP on the 1st.", "entity": "user", "attribute": "investments", "time": "2025-11-01T10:00:00", "source": "user"},
+    {"id": "M12", "text": "The user wants to build an emergency fund covering six months of expenses.", "entity": "user", "attribute": "savings_goal", "time": "2026-01-05T21:00:00", "source": "user"},
+    {"id": "M13", "text": "The user files income tax under the new tax regime.", "entity": "user", "attribute": "tax_regime", "time": "2026-06-20T18:00:00", "source": "user"},
+    {"id": "M14", "text": "The user's car insurance renews every August.", "entity": "user", "attribute": "insurance", "time": "2025-08-05T10:00:00", "source": "user"},
+    {"id": "M15", "text": "The user prefers getting a weekly spending summary every Sunday.", "entity": "user", "attribute": "report_preference", "time": "2026-04-06T09:00:00", "source": "user"},
+    {"id": "M16", "text": "The user splits rent with a flatmate using Splitwise.", "entity": "user", "attribute": "shared_expenses", "time": "2026-05-01T20:00:00", "source": "user"}
+  ],
+  "observation": {"text": "I closed my HDFC Regalia credit card yesterday.", "source": "user", "time": "2026-10-25T12:00:00"},
+  "gold": {
+    "actions": {
+      "M1": "REVOKE", "M2": "REVISE", "M3": "VERIFY", "M4": "REVISE", "M5": "KEEP", "M6": "KEEP",
+      "M7": "KEEP", "M8": "KEEP", "M9": "KEEP", "M10": "KEEP", "M11": "KEEP", "M12": "KEEP",
+      "M13": "KEEP", "M14": "KEEP", "M15": "KEEP", "M16": "KEEP"
+    },
+    "dependencies": [["M1", "M2"], ["M1", "M3"], ["M1", "M4"]],
+    "eval_questions": [
+      {"q": "Does the user have an HDFC Regalia credit card?", "gold_answer": "No, they closed it.", "depends_on": ["M1"]},
+      {"q": "Which card are the user's Netflix and Spotify subscriptions charged to?", "gold_answer": "Unknown; they were on the HDFC Regalia card, which is now closed.", "depends_on": ["M2"]},
+      {"q": "Where is the user's salary credited?", "gold_answer": "Their HDFC Bank savings account.", "depends_on": ["M5"]},
+      {"q": "When is the user's home loan EMI due?", "gold_answer": "On the 10th of each month (HDFC Bank home loan).", "depends_on": ["M6"]},
+      {"q": "Which credit card does the user use for online shopping?", "gold_answer": "The SBI Cashback credit card.", "depends_on": ["M7"]}
+    ]
+  }
+}
