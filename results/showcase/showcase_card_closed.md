@@ -51,6 +51,18 @@ Final actions matching gold: **13/16**.
 
 Chosen: **R1**.
 
+## Lambda sensitivity
+
+Set that would be chosen under other weights, recomputed offline from the scores above (benefit, collateral, evidence cost and size do not depend on λ). λe = 0.1 (config); configured cell in bold.
+
+|  | λs=0.0 | λs=0.01 | λs=0.02 | λs=0.05 |
+|---|---|---|---|---|
+| λc=0.1 | R1 | R1 | R1 | R1 |
+| λc=0.25 | R1 | R1 | R1 | R1 |
+| λc=0.5 | R1 | R1 | R1 | **R1** |
+
+λe ∈ {0.0, 0.05, 0.1}: never changes the choice.
+
 ## Answers: without vs with CSMR
 
 Same agent and retrieval for both. *Without* = original memories + stored observation (append-only); *With* = committed store.
@@ -70,4 +82,4 @@ Same agent and retrieval for both. *Without* = original memories + stored observ
 | M1 | REVOKE | The user has an HDFC Regalia credit card. | The user has an HDFC Regalia credit card. | active → revoked | v1 → v2 |
 | OBS17 | ADD | (new) | The user closed their HDFC Regalia credit card. | - → active | v0 → v1 |
 
-*Pipeline LLM calls: 83 (cache hits 22) · wall time: 252.6s*
+*Pipeline LLM calls: 83 (cache hits 82) · wall time: 1.4s*

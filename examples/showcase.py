@@ -19,6 +19,7 @@ from csmr.pipeline.overlay import render  # noqa: E402
 from csmr.scenario import load_scenario  # noqa: E402
 
 OUT_DIR = Path("results/showcase")
+GRID_C, GRID_S, GRID_E = (0.1, 0.25, 0.5), (0.0, 0.01, 0.02, 0.05), (0.0, 0.05, 0.1)  # lambda sensitivity grid
 
 
 def short(s: str, n: int = 70) -> str:
@@ -37,6 +38,38 @@ def table(header: list[str], rows: list[list]) -> list[str]:
 def agent_view(memories) -> list:
     """Same rendering the pipeline's agent uses (revoked hidden, unverified/conditional tagged)."""
     return [r for m in memories if (r := render(m))]
+
+
+def pick(sets: list[dict], lc: float, le: float, ls: float, eps: float) -> str:
+    """Re-run the selection rule (counterfactual.select) on stored scores under other lambdas; no LLM calls."""
+    feas = [r for r in sets if r["feasible"]]
+    tot = {r["name"]: (s := r["score"])["benefit"] - lc * s["collateral"] - le * s["evidence_cost"] - ls * s["size"]
+           for r in feas}
+    top = max(tot.values())
+    return min((r for r in feas if tot[r["name"]] >= top - eps), key=lambda r: r["score"]["size"])["name"]
+
+
+def sensitivity(sets: list[dict], chosen: str, cfg: dict) -> list[str]:
+    eps, le0 = cfg["tie_eps"], cfg["lambda_e"]
+    if cfg["ablation"]["use_minimality"]:  # self-check: the configured cell reproduces the pipeline's choice
+        assert pick(sets, cfg["lambda_c"], le0, cfg["lambda_s"], eps) == chosen
+    rows = []
+    for lc in GRID_C:
+        row = [f"λc={lc}"]
+        for ls in GRID_S:
+            name = pick(sets, lc, le0, ls, eps)
+            row.append(f"**{name}**" if (lc, ls) == (cfg["lambda_c"], cfg["lambda_s"]) else name)
+        rows.append(row)
+    diffs = [f"λc={lc}, λs={ls}: " + " / ".join(f"{pick(sets, lc, le, ls, eps)} (λe={le})" for le in GRID_E)
+             for lc in GRID_C for ls in GRID_S if len({pick(sets, lc, le, ls, eps) for le in GRID_E}) > 1]
+    out = ["## Lambda sensitivity", "",
+           f"Set that would be chosen under other weights, recomputed offline from the scores above (benefit, collateral, "
+           f"evidence cost and size do not depend on λ). λe = {le0} (config); configured cell in bold.", ""]
+    out += table(["", *(f"λs={ls}" for ls in GRID_S)], rows)
+    out += ["", f"λe ∈ {{{', '.join(map(str, GRID_E))}}}: "
+            + (f"changes the choice in {len(diffs)}/{len(GRID_C) * len(GRID_S)} cells — " + "; ".join(diffs)
+               if diffs else "never changes the choice.")]
+    return out
 
 
 def report(path: Path) -> tuple[str, str]:
@@ -81,7 +114,9 @@ def report(path: Path) -> tuple[str, str]:
             rows.append([f"**{r['name']}**" if r["chosen"] else r["name"], acts, *nums, status,
                          "✅" if r["chosen"] else ""])
         out += table(["set", "actions", "benefit", "collateral", "evidence cost", "size", "total", "feasible", "chosen"], rows)
-        out += ["", f"Chosen: **{t.chosen}**."]
+        out += ["", f"Chosen: **{t.chosen}**.", ""]
+        if all(r["score"] for r in t.repair_sets if r["feasible"]):  # scores absent under the use_counterfactual ablation
+            out += sensitivity(t.repair_sets, t.chosen, csmr.cfg)
 
     obs_id = next(x["id"] for x in t.transitions if x["action"] == "ADD")
     without = agent_view(list(before.values()) + [store.get(obs_id)])  # append-only: originals + stored observation

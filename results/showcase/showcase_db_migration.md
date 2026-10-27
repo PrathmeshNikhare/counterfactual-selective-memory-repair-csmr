@@ -49,6 +49,18 @@ Final actions matching gold: **12/18**.
 
 Chosen: **R0**.
 
+## Lambda sensitivity
+
+Set that would be chosen under other weights, recomputed offline from the scores above (benefit, collateral, evidence cost and size do not depend on λ). λe = 0.1 (config); configured cell in bold.
+
+|  | λs=0.0 | λs=0.01 | λs=0.02 | λs=0.05 |
+|---|---|---|---|---|
+| λc=0.1 | R2 | R2 | R2 | R0 |
+| λc=0.25 | R2 | R2 | R2 | R0 |
+| λc=0.5 | R2 | R2 | R0 | **R0** |
+
+λe ∈ {0.0, 0.05, 0.1}: never changes the choice.
+
 ## Answers: without vs with CSMR
 
 Same agent and retrieval for both. *Without* = original memories + stored observation (append-only); *With* = committed store.
@@ -68,4 +80,4 @@ Same agent and retrieval for both. *Without* = original memories + stored observ
 |---|---|---|---|---|---|
 | OBS19 | ADD | (new) | The user’s ShopKart backend now runs entirely on MongoDB Atlas. | - → active | v0 → v1 |
 
-*Pipeline LLM calls: 78 (cache hits 52) · wall time: 77.9s*
+*Pipeline LLM calls: 78 (cache hits 77) · wall time: 28.4s*
