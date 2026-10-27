@@ -10,8 +10,8 @@ from csmr.types import Observation
 
 CAR = {"state_change": {"entity": "user", "attribute": "vehicle_ownership", "old": "owns a car", "new": "no car",
                         "confidence": 0.95, "statement": "The user sold their car.", "change_type": "remove"}}
-PROBES = {"change_question": "Does the user own a car?",
-          "memory_questions": {"M2": "How does the user commute?", "M3": "Does the user spend on fuel?"}}
+PROBES = {"change_question": "What vehicle does the user own?",
+          "memory_questions": {"M2": "How does the user commute?", "M3": "What does the user spend on fuel?"}}
 
 
 def _llm(revise):

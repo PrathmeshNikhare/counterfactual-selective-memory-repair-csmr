@@ -17,7 +17,10 @@ from csmr.pipeline.overlay import view
 from csmr.types import MODIFYING_ACTIONS, Action, CandidateInfo, Memory, Observation, RepairSet, StateChange
 
 PROBE_PROMPT = """Write neutral questions about the user's CURRENT state, phrased as a user or a downstream task would
-ask them (e.g. "How does the user commute to work?", "Does the user own a car?", "Does the user prefer driving?").
+ask them (e.g. "How does the user commute to work?", "What vehicle does the user own?", "Which way of travelling does
+the user prefer?").
+Ask open questions (what / which / where / how / who), never yes/no questions. Never use change-hinting words such as
+"still", "anymore", "no longer", "now" or "yet".
 Always phrase them in the third person ("the user"), never "you" or "your".
 Name the specific subject exactly as the memory text names it (a project, product, place or person, e.g.
 "Which framework does the Acme app use?"), never a generic stand-in such as "the project" or a field name.
@@ -49,7 +52,7 @@ Decide in two steps.
    - "vague" (0.5): determined_by_change is true but the answer is "unknown" or vague.
 Return JSON only: {{"determined_by_change": true | false, "verdict": "consistent" | "vague" | "contradicts"}}"""
 RETRY_NUDGE = "\nReturn exactly the JSON object described above."  # changes the prompt so the disk cache is not hit again
-PROBE_FALLBACK = "Is it still true that {text}?"
+PROBE_FALLBACK = "What is the current state of this: {text}?"
 
 VERDICT_SCORE = {"consistent": 1.0, "vague": 0.5, "contradicts": 0.0}
 
@@ -61,24 +64,37 @@ def _presupposes(q: str, obs: Observation, cands: dict[str, CandidateInfo], stor
     return any(w in novel for w in re.findall(r"[a-z]+", q.lower()))
 
 
+def _change_hinting(q: str, cfg: dict) -> bool:
+    """True if q is a yes/no question (starts with an auxiliary) or contains a change-hinting word ("still")."""
+    words = re.findall(r"[a-z]+", q.lower())
+    return (not words or words[0] in cfg["probe_yes_no_starts"]
+            or any(re.search(p, q.lower()) for p in cfg["probe_banned_patterns"]))
+
+
 def generate_probes(delta: StateChange, obs: Observation, cands: dict[str, CandidateInfo],
                     store: MemoryStoreAdapter, n: int, cfg: dict | None = None) -> list[str]:
     """One neutral probe about the root fact's current value (first candidate in order if there is no root), then
-    one per candidate (roots/closest hops first, KEEP included), presupposing probes dropped, capped at n.
+    one per candidate (roots/closest hops first, KEEP included), presupposing, yes/no and change-hinting probes
+    dropped, capped at n.
     The attribute key is never shown: probes name the subject as the memory text does."""
     cfg = cfg or load_config()
     mems = "\n".join(f"- {m}: {store.get(m).text}" for m in cands)
     order = sorted(cands, key=lambda m: (not cands[m].is_root, -cands[m].p_dep, int(re.sub(r"\D", "", m) or 0), m))
     fact = " ".join(store.get(m).text for m in ([m for m in order if cands[m].is_root] or order[:1]))
     out = llm.try_json(PROBE_PROMPT.format(fact=fact, memories=mems), max_tokens=cfg["probe_max_tokens"], cfg=cfg)
+    # templates are built from memory text only, so they are never filtered (a "now"/"still" there is the memory's own)
+    templates = [PROBE_FALLBACK.format(text=store.get(m).text.rstrip(". ")) for m in order]
     if (out is None or not str(out.get("change_question") or "").strip()
             or not isinstance(out.get("memory_questions"), dict)):
         llm.fallback("probes", "malformed response; one template probe per candidate")
-        qs = [PROBE_FALLBACK.format(text=store.get(m).text.rstrip(". ")) for m in order]
-    else:
-        per_mem = out["memory_questions"]
-        qs = [str(out["change_question"]).strip()] + [str(per_mem[m]).strip() for m in order if m in per_mem]
-    return [q for q in qs if not _presupposes(q, obs, cands, store)][:n]
+        return templates[:n]
+    per_mem = out["memory_questions"]
+    qs = [str(out["change_question"]).strip()] + [str(per_mem[m]).strip() for m in order if m in per_mem]
+    kept = [q for q in qs if not _presupposes(q, obs, cands, store) and not _change_hinting(q, cfg)]
+    if not kept:
+        llm.fallback("probes", "every probe filtered out; one template probe per candidate")
+        return templates[:n]
+    return kept[:n]
 
 
 def _unknown_like(ans: str, cfg: dict) -> bool:

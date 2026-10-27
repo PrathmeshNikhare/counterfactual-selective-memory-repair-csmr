@@ -82,6 +82,10 @@ lambda_s: 0.05      # repair size
 verify_cost: 0.1
 call_cost: 0.0
 tie_eps: 1.0e-6        # totals within this are tied -> smaller |R| wins
+probe_yes_no_starts: [is, are, was, were, am, do, does, did, has, have, had, can, could, will, would, shall, should,
+                      may, might, must]   # a probe starting with one of these is a yes/no question -> dropped
+probe_banned_patterns: ["\\bstill\\b", "\\bany ?more\\b", "\\bany longer\\b", "\\bno longer\\b", "\\bnow\\b",
+                        "\\bnowadays\\b", "\\bthese days\\b", "\\byet\\b"]   # change-hinting words -> probe dropped
 probe_max_tokens: 2048  # reasoning model needs headroom before the JSON
 judge_max_tokens: 1024
 cue_max_tokens: 1024      # dependency causal-cue call

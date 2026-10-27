@@ -1,4 +1,5 @@
 import copy
+import re
 
 import pytest
 
@@ -41,7 +42,7 @@ def _setup(monkeypatch):
         return {"determined_by_change": True, "verdict": v, "score": cf.VERDICT_SCORE[v]}
 
     monkeypatch.setattr(cf, "judge", fake_judge)
-    probes = ["Does the user own a car?", "How does the user commute?", "Does the user spend on fuel?"]
+    probes = ["What vehicle does the user own?", "How does the user commute?", "What does the user spend on fuel?"]
     return store, cands, sets, revised, probes, sc.observation
 
 
@@ -105,11 +106,58 @@ def test_presupposing_probes_rejected(monkeypatch):
     sc = load_scenario("data/dev/car_sale.json")  # observation: "I sold my car."
     cands = {"M1": _c("M1", 0, 1, 1, True), "M2": _c("M2", 1, .9, .9)}
     monkeypatch.setattr(llm, "call", lambda p, **k: {
-        "change_question": "Does the user own a car?",
-        "memory_questions": {"M1": "What will you do now that you sold your car?",
+        "change_question": "What vehicle does the user own?",
+        "memory_questions": {"M1": "What will the user do after they sold the car?",
                              "M2": "How does the user commute to work?"}})
     qs = cf.generate_probes(DELTA, sc.observation, cands, InMemoryAdapter(sc.memories), 6)
-    assert qs == ["Does the user own a car?", "How does the user commute to work?"]
+    assert qs == ["What vehicle does the user own?", "How does the user commute to work?"]
+
+
+def test_yes_no_and_change_hinting_probes_rejected(monkeypatch):
+    sc = load_scenario("data/dev/car_sale.json")
+    cands = {f"M{i}": _c(f"M{i}", 1, .9, .9) for i in range(1, 6)}
+    cands["M1"].is_root = True
+    monkeypatch.setattr(llm, "call", lambda p, **k: {
+        "change_question": "Which vehicle does the user own?",
+        "memory_questions": {"M1": "Does the user own a car?",
+                             "M2": "How does the user still commute to work?",
+                             "M3": "Where does the user no longer park?",
+                             "M4": "What does the user spend on fuel anymore?",
+                             "M5": "In which city does the user drive?"}})
+    qs = cf.generate_probes(DELTA, sc.observation, cands, InMemoryAdapter(sc.memories), 9)
+    assert qs == ["Which vehicle does the user own?", "In which city does the user drive?"]
+
+
+def test_template_probe_with_hint_word_kept(monkeypatch):
+    store = InMemoryAdapter([Memory("M1", "The user now lives in Pune.", "user", "city", "2026-03-02")])
+    obs = load_scenario("data/dev/car_sale.json").observation
+    llm.reset_stats()
+    monkeypatch.setattr(llm, "call", lambda p, **k: {})  # malformed -> template, which mentions "now" from the memory
+    assert cf.generate_probes(DELTA, obs, {"M1": _c("M1", 0, 1, 1, True)}, store, 6) == [
+        "What is the current state of this: The user now lives in Pune?"]
+    assert llm.stats()["fallbacks"] == {"probes": 1}
+
+
+def test_all_llm_probes_filtered_falls_back_to_templates(monkeypatch):
+    sc = load_scenario("data/dev/car_sale.json")
+    cands = {"M1": _c("M1", 0, 1, 1, True), "M2": _c("M2", 1, .9, .9)}
+    store = InMemoryAdapter(sc.memories)
+    monkeypatch.setattr(llm, "call", lambda p, **k: {
+        "change_question": "Does the user own a car?",
+        "memory_questions": {"M1": "Is the car still owned?", "M2": "How does the user commute after they sold it?"}})
+    llm.reset_stats()
+    assert cf.generate_probes(DELTA, sc.observation, cands, store, 6) == [
+        f"What is the current state of this: {store.get(m).text.rstrip('. ')}?" for m in ("M1", "M2")]
+    assert llm.stats()["fallbacks"] == {"probes": 1}
+
+
+def test_probe_prompt_asks_open_questions(monkeypatch):
+    sc = load_scenario("data/dev/car_sale.json")
+    seen = {}
+    monkeypatch.setattr(llm, "call", lambda p, **k: seen.update(p=p) or {"change_question": "q?"})
+    cf.generate_probes(DELTA, sc.observation, {"M1": _c("M1", 0, 1, 1, True)}, InMemoryAdapter(sc.memories), 6)
+    assert "never yes/no questions" in seen["p"] and '"still", "anymore", "no longer"' in seen["p"]
+    assert not re.search(r'"(Does|Is|Do|Are) ', seen["p"])  # no yes/no examples left in the prompt
 
 
 def test_probe_prompt_demands_neutrality(monkeypatch):
@@ -201,7 +249,7 @@ def test_malformed_probes_fall_back_to_templates(monkeypatch):
     for bad in ({}, {"change_question": ""}, {"change_question": "q?", "memory_questions": "oops"}):
         monkeypatch.setattr(llm, "call", lambda p, **k: bad)
         qs = cf.generate_probes(DELTA, sc.observation, cands, store, 6)
-        assert qs == [f"Is it still true that {store.get(m).text.rstrip('. ')}?" for m in ("M1", "M2")]
+        assert qs == [f"What is the current state of this: {store.get(m).text.rstrip('. ')}?" for m in ("M1", "M2")]
     assert llm.stats()["fallbacks"] == {"probes": 3}
 
 

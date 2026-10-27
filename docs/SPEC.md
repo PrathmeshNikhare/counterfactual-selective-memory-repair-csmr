@@ -169,6 +169,7 @@ def generate_probes(delta, obs, cands, store, n: int) -> list[str]   # LLM; from
 # NEUTRAL questions about the user's CURRENT state ("How does the user commute to work?"), never mentioning or presupposing the change.
 # One "change_question" about the CURRENT value of the root fact (root memory text(s); the first candidate in order if there is no root), then one per candidate (KEEP-proposed included, so over-repair is detectable), roots first, then by P_dep descending, ties by numeric memory id (never string order: "M12" must not outrank "M2"); capped at n (config n_probes=6).
 # Probes using a word only the observation introduces (e.g. "sold") are dropped.
+# Probes are open questions (what/which/where/how/who): LLM probes starting with a yes/no word (cfg.probe_yes_no_starts) or containing a change-hinting word (cfg.probe_banned_patterns: "still", "anymore", "no longer", ...) are dropped. If no LLM probe survives, the template fallback probes (below) are used and a "probes" fallback is recorded.
 def judge(answer: str, question: str, delta, obs, cfg) -> dict       # ONE call, two explicit steps:
 # {"determined_by_change": bool, "verdict": "consistent"|"vague"|"contradicts"} -> score 1.0 / 0.5 / 0.0
 #   determined_by_change=false: "unknown"/uncertain answers are consistent (1.0)
@@ -193,7 +194,7 @@ EvidenceCost  = (#VERIFY actions in rs) * cfg.verify_cost + llm_calls_for_rs * c
 ```
 - argmax over feasible sets; ties → smaller |R|.
 - Cache answers by (question, hash of view) — identical views reuse results.
-- Malformed LLM JSON never crashes a run; each fallback is counted in `Trace.llm_stats["fallbacks"]` (`llm.fallback(kind)`): extract (missing/invalid keys) → no state change; probes (missing/invalid) → one template probe per candidate, "Is it still true that <memory text>?"; judge → retried once with a changed prompt, then verdict "vague" (0.5), `determined_by_change` null.; causal cue (dependency) → retried once, then "no"; REVISE text → retried once, then template "Previously: <text>. Possibly outdated after: <statement>"; CONDITIONAL condition → retried once, then "it is not affected by: <statement>" (kinds `causal_cue`, `revise_text`, `condition_text`).
+- Malformed LLM JSON never crashes a run; each fallback is counted in `Trace.llm_stats["fallbacks"]` (`llm.fallback(kind)`): extract (missing/invalid keys) → no state change; probes (missing/invalid) → one template probe per candidate, "What is the current state of this: <memory text>?" (built from memory text only, so never filtered); judge → retried once with a changed prompt, then verdict "vague" (0.5), `determined_by_change` null.; causal cue (dependency) → retried once, then "no"; REVISE text → retried once, then template "Previously: <text>. Possibly outdated after: <statement>"; CONDITIONAL condition → retried once, then "it is not affected by: <statement>" (kinds `causal_cue`, `revise_text`, `condition_text`).
 - Ties: totals within `cfg.tie_eps` are tied → smaller |R|. Token budgets: `cfg.probe_max_tokens`, `cfg.judge_max_tokens`.
 - Ablation `use_counterfactual=false`: select R3 (apply all proposed actions) without probes.
 - Ablation `use_minimality=false`: λc = λs = 0.
