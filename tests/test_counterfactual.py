@@ -151,6 +151,17 @@ def test_all_llm_probes_filtered_falls_back_to_templates(monkeypatch):
     assert llm.stats()["fallbacks"] == {"probes": 1}
 
 
+def test_probe_prompt_asks_main_predicate_without_presupposing(monkeypatch):
+    sc = load_scenario("data/dev/car_sale.json")
+    seen = {}
+    monkeypatch.setattr(llm, "call", lambda p, **k: seen.update(p=p) or {"change_question": "q?"})
+    cf.generate_probes(DELTA, sc.observation, {"M1": _c("M1", 0, 1, 1, True)}, InMemoryAdapter(sc.memories), 6)
+    p = " ".join(seen["p"].split())
+    assert "directly answers, phrased so it does NOT assume the memory's claim is true" in p
+    assert "ask about the memory's main predicate, not a detail that presupposes it" in p
+    assert 'good "What does the user grow in their garden?"' in p and 'bad "Which tomato variety' in p
+
+
 def test_probe_prompt_asks_open_questions(monkeypatch):
     sc = load_scenario("data/dev/car_sale.json")
     seen = {}

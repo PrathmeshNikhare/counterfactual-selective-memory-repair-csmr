@@ -166,7 +166,9 @@ Retrieve top-k by cosine to the question from the given memory list; LLM answers
 
 ```python
 def generate_probes(delta, obs, cands, store, n: int) -> list[str]   # LLM; from candidate memory texts ONLY
-# NEUTRAL questions about the user's CURRENT state ("How does the user commute to work?"), never mentioning or presupposing the change.
+# NEUTRAL questions about the user's CURRENT state ("What does the user grow in their garden?"), never mentioning or presupposing the change.
+# Each probe is the question its memory (the fact, for the change_question) directly answers, about the memory's MAIN PREDICATE, phrased so it does not assume the memory's claim is true ("The user grows tomatoes in their garden" -> "What does the user grow in their garden?", not "Which tomato variety does the user grow?").
+# Prompt examples use no wording from dev/showcase scenarios or their gold questions.
 # One "change_question" about the CURRENT value of the root fact (root memory text(s); the first candidate in order if there is no root), then one per candidate (KEEP-proposed included, so over-repair is detectable), roots first, then by P_dep descending, ties by numeric memory id (never string order: "M12" must not outrank "M2"); capped at n (config n_probes=6).
 # Probes using a word only the observation introduces (e.g. "sold") are dropped.
 # Probes are open questions (what/which/where/how/who): LLM probes starting with a yes/no word (cfg.probe_yes_no_starts) or containing a change-hinting word (cfg.probe_banned_patterns: "still", "anymore", "no longer", ...) are dropped. If no LLM probe survives, the template fallback probes (below) are used and a "probes" fallback is recorded.

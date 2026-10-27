@@ -17,14 +17,17 @@ from csmr.pipeline.overlay import view
 from csmr.types import MODIFYING_ACTIONS, Action, CandidateInfo, Memory, Observation, RepairSet, StateChange
 
 PROBE_PROMPT = """Write neutral questions about the user's CURRENT state, phrased as a user or a downstream task would
-ask them (e.g. "How does the user commute to work?", "What vehicle does the user own?", "Which way of travelling does
-the user prefer?").
+ask them (e.g. "What does the user grow in their garden?").
 Ask open questions (what / which / where / how / who), never yes/no questions. Never use change-hinting words such as
 "still", "anymore", "no longer", "now" or "yet".
+Each question must be the question its memory (for the change_question: the fact) directly answers, phrased so it does
+NOT assume the memory's claim is true: ask about the memory's main predicate, not a detail that presupposes it.
+E.g. memory "The user grows tomatoes in their garden": good "What does the user grow in their garden?";
+bad "Which tomato variety does the user grow?" (presupposes tomatoes).
 Always phrase them in the third person ("the user"), never "you" or "your".
 Name the specific subject exactly as the memory text names it (a project, product, place or person, e.g.
-"Which framework does the Acme app use?"), never a generic stand-in such as "the project" or a field name.
-Do NOT mention or presuppose any recent change or event (no "now that...", "after selling...", "since you...").
+"Which theme does the Fernhill wiki use?"), never a generic stand-in such as "the project" or a field name.
+Do NOT mention or presuppose any recent change or event (no "now that...", "after switching...", "since you...").
 Write one question per stored memory below (even if it seems unaffected) plus one "change_question" asking for the
 current value of this stored fact: "{fact}"
 Questions must concern only those memories or that fact, never unrelated topics.
