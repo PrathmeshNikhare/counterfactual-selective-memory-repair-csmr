@@ -44,8 +44,8 @@ Final actions matching gold: **12/18**.
 |---|---|---|---|---|---|---|---|---|
 | **R0** | (none) | 0.333 | 0.000 | 0.000 | 0 | 0.333 | yes | ✅ |
 | R1 | M1:REVISE | 0.333 | 0.000 | 0.000 | 1 | 0.283 | yes |  |
-| R2 | M1:REVISE, M2:REVISE, M3:REVISE, M4:REVISE, M5:REVISE, M6:REVISE | 0.583 | 0.313 | 0.000 | 6 | 0.127 | yes |  |
-| R4 | M1:REVISE, M2:REVISE, M3:REVISE, M4:REVISE, M5:REVISE, M6:REVISE, M7:REVISE, M8:REVISE, M9:REVISE, M10:REVISE, M11:REVISE | 0.583 | 3.694 | 0.000 | 11 | -1.814 | yes |  |
+| R2 | M1:REVISE, M2:REVISE, M3:REVISE, M4:REVISE, M5:REVISE, M6:REVISE | 0.500 | 0.313 | 0.000 | 6 | 0.043 | yes |  |
+| R4 | M1:REVISE, M2:REVISE, M3:REVISE, M4:REVISE, M5:REVISE, M6:REVISE, M7:REVISE, M8:REVISE, M9:REVISE, M10:REVISE, M11:REVISE | 0.667 | 3.694 | 0.000 | 11 | -1.731 | yes |  |
 
 Chosen: **R0**.
 
@@ -56,8 +56,8 @@ Set that would be chosen under other weights, recomputed offline from the scores
 |  | λs=0.0 | λs=0.01 | λs=0.02 | λs=0.05 |
 |---|---|---|---|---|
 | λc=0.1 | R2 | R2 | R2 | R0 |
-| λc=0.25 | R2 | R2 | R2 | R0 |
-| λc=0.5 | R2 | R2 | R0 | **R0** |
+| λc=0.25 | R2 | R2 | R0 | R0 |
+| λc=0.5 | R2 | R0 | R0 | **R0** |
 
 λe ∈ {0.0, 0.05, 0.1}: never changes the choice.
 
@@ -80,4 +80,4 @@ Same agent and retrieval for both. *Without* = original memories + stored observ
 |---|---|---|---|---|---|
 | OBS19 | ADD | (new) | The user’s ShopKart backend now runs entirely on MongoDB Atlas. | - → active | v0 → v1 |
 
-*Pipeline LLM calls: 78 (cache hits 77) · wall time: 28.4s*
+*Pipeline LLM calls: 78 (cache hits 53) · wall time: 86.5s*
