@@ -28,6 +28,18 @@ def summary(t: dict) -> str:
     return "\n".join(out)
 
 
+def before_after(t: dict, store: InMemoryAdapter) -> str:
+    """Committed changes: before from the history entry the commit pushed, after from the store."""
+    cell = lambda text, status, v: f"{text} ({status}, v{v})".replace("|", "\\|")
+    out = ["Before -> After", "| id | action | before (text, status, version) | after (text, status, version) |",
+           "|---|---|---|---|"]
+    for tr in t["transitions"]:  # already = non-KEEP actions + the ADDed observation memory
+        m = store.get(tr["id"])
+        before = "-" if tr["action"] == "ADD" else cell(m.history[-1]["text"], m.history[-1]["status"], m.history[-1]["version"])
+        out.append(f"| {m.id} | {tr['action']} | {before} | {cell(m.text, m.status, m.version)} |")
+    return "\n".join(out)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("scenario")
@@ -38,8 +50,11 @@ def main() -> None:
     sc = load_scenario(args.scenario)
     memories, observation = sc.memories, sc.observation
     del sc  # gold lives on the Scenario; drop it so nothing downstream can reach it
-    trace = run_pipeline(observation, InMemoryAdapter(memories), load_config(overrides=args.overrides)).to_dict()
+    store = InMemoryAdapter(memories)
+    trace = run_pipeline(observation, store, load_config(overrides=args.overrides)).to_dict()
     print(summary(trace))
+    if trace["delta"] is not None:
+        print(before_after(trace, store))
     if args.trace:
         Path(args.trace).parent.mkdir(parents=True, exist_ok=True)
         Path(args.trace).write_text(json.dumps(trace, indent=2), encoding="utf-8")
