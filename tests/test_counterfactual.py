@@ -157,16 +157,29 @@ def test_all_llm_probes_filtered_falls_back_to_templates(monkeypatch):
     assert llm.stats()["fallbacks"] == {"probes": 1}
 
 
-def test_probe_prompt_asks_main_predicate_without_presupposing(monkeypatch):
+def test_probe_prompt_targets_changed_detail(monkeypatch):
     sc = load_scenario("data/dev/car_sale.json")
     seen = {}
     monkeypatch.setattr(llm, "call", lambda p, **k: seen.update(p=p) or {"change_question": "q?"})
     cf.generate_probes(DELTA, sc.observation, {"M1": _c("M1", 0, 1, 1, True)}, InMemoryAdapter(sc.memories), 6)
     p = " ".join(seen["p"].split())
-    assert "directly answers, phrased so it does NOT assume the memory's claim is true" in p
-    assert "ask about the memory's main predicate, not a detail that presupposes it" in p
-    assert 'good "What does the user grow in their garden?"' in p and 'bad "Which tomato variety' in p
+    assert "ask about the detail of that memory that is connected to the stored fact quoted below" in p
+    assert "reveal whether the memory still holds" in p and "Never presuppose the memory's old value" in p
+    assert 'good "Where does the user buy sailing supplies?"; bad "What does the user buy?"' in p
+    assert 'over-generic question' in p and "main predicate" not in p
 
+
+def test_over_generic_probes_dropped(monkeypatch):
+    sc = load_scenario("data/dev/car_sale.json")
+    cands = {"M1": _c("M1", 0, 1, 1, True), "M2": _c("M2", 1, .9, .9), "M3": _c("M3", 1, .8, .9)}
+    cands["M2"].proposed = Action.REVISE
+    monkeypatch.setattr(llm, "call", lambda p, **k: {
+        "change_question": "Which vehicle does the user own?",
+        "memory_questions": {"M2": "What does the user have?", "M3": "How much does the user spend on fuel?"}})
+    probes, gaps = cf.generate_probes(DELTA, sc.observation, cands, InMemoryAdapter(sc.memories), 6)
+    assert _qs((probes, gaps)) == ["Which vehicle does the user own?", "How much does the user spend on fuel?"]
+    assert gaps == {"M2": "filtered"}
+    assert not cf._too_generic("Which phone does the user's laptop use?", CFG) and cf._too_generic("What does the user's own?", CFG)
 
 def test_probe_prompt_asks_open_questions(monkeypatch):
     sc = load_scenario("data/dev/car_sale.json")
@@ -476,16 +489,16 @@ def test_probe_coverage_dedup_guarantee_and_gaps(monkeypatch):
     for m in ("M1", "M2", "M3", "M4", "M6"):
         cands[m].proposed = Action.REVISE  # M12, M13 stay KEEP
     monkeypatch.setattr(llm, "call", lambda p, **k: {
-        "change_question": "What does the user own?",
-        "memory_questions": {"M1": "what does  the user OWN?",          # duplicate of the change question
+        "change_question": "Which vehicle does the user own?",
+        "memory_questions": {"M1": "which vehicle does  the user OWN?",          # duplicate of the change question
                              "M12": "When does the user work?", "M13": "When is the stand-up?",
                              "M2": "How does the user get to the office?",
                              "M3": "Does the user spend money on fuel?",  # yes/no -> filtered
-                             "M4": "What does the user prefer?"}})        # M6: missing
+                             "M4": "Which brand does the user prefer?"}})  # M6: missing
     probes, gaps = cf.generate_probes(DELTA, sc.observation, cands, store, 3)
     assert [(p["question"], p["source"]) for p in probes] == [
-        ("What does the user own?", "M1"),  # change probe: source is the root
-        ("How does the user get to the office?", "M2"), ("What does the user prefer?", "M4")]
+        ("Which vehicle does the user own?", "M1"),  # change probe: source is the root
+        ("How does the user get to the office?", "M2"), ("Which brand does the user prefer?", "M4")]
     assert probes[0]["source_text"] == store.get("M1").text
     assert gaps == {"M3": "filtered", "M6": "missing"}  # M1 is covered by the change probe, so not a gap
     probes, _ = cf.generate_probes(DELTA, sc.observation, cands, store, 5)  # spare slots fill in p_dep order

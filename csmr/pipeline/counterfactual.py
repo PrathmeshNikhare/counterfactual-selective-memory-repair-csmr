@@ -20,10 +20,13 @@ PROBE_PROMPT = """Write neutral questions about the user's CURRENT state, phrase
 ask them (e.g. "What does the user grow in their garden?").
 Ask open questions (what / which / where / how / who), never yes/no questions. Never use change-hinting words such as
 "still", "anymore", "no longer", "now" or "yet".
-Each question must be the question its memory (for the change_question: the fact) directly answers, phrased so it does
-NOT assume the memory's claim is true: ask about the memory's main predicate, not a detail that presupposes it.
-E.g. memory "The user grows tomatoes in their garden": good "What does the user grow in their garden?";
-bad "Which tomato variety does the user grow?" (presupposes tomatoes).
+Each memory question must ask about the detail of that memory that is connected to the stored fact quoted below (the
+same kind of detail: a place, a device, a provider, a person...), so its answer would reveal whether the memory still
+holds if that fact were different. Never presuppose the memory's old value of that detail.
+E.g. stored fact "The user keeps their sailboat at the Harbor Point marina", memory "The user buys sailing supplies from
+a chandlery next to Harbor Point": good "Where does the user buy sailing supplies?"; bad "What does the user buy?"
+(too generic) or "Which shop next to Harbor Point does the user use?" (presupposes the old value).
+Never ask an over-generic question: the user + a generic verb + nothing specific (e.g. "What does the user have?").
 Always phrase them in the third person ("the user"), never "you" or "your".
 Name the specific subject exactly as the memory text names it (a project, product, place or person, e.g.
 "Which theme does the Fernhill wiki use?"), never a generic stand-in such as "the project" or a field name.
@@ -79,6 +82,11 @@ def _change_hinting(q: str, cfg: dict) -> bool:
             or any(re.search(p, q.lower()) for p in cfg["probe_banned_patterns"]))
 
 
+def _too_generic(q: str, cfg: dict) -> bool:
+    """True if q has no word beyond wh-words, auxiliaries, "the user" and generic verbs ("What does the user have?")."""
+    return all(w in cfg["probe_generic_words"] for w in re.findall(r"[a-z]+", q.lower()))
+
+
 def _norm(q: str) -> str:
     """Duplicate key: case- and whitespace-insensitive."""
     return " ".join(q.casefold().split())
@@ -125,7 +133,7 @@ def generate_probes(delta: StateChange, obs: Observation, cands: dict[str, Candi
     raw = [(str(out["change_question"]).strip(), fact_ids[0] if fact_ids else None)]
     for q, m in raw + [(str(per_mem[m]).strip(), m) for m in order if m in per_mem]:
         key = _norm(q)
-        if _presupposes(q, obs, cands, store) or _change_hinting(q, cfg):
+        if _presupposes(q, obs, cands, store) or _change_hinting(q, cfg) or _too_generic(q, cfg):
             lost.setdefault(m, "filtered")
         elif key in seen:
             lost.setdefault(m, "duplicate")

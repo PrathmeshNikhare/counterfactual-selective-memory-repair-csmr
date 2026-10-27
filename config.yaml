@@ -86,6 +86,9 @@ probe_yes_no_starts: [is, are, was, were, am, do, does, did, has, have, had, can
                       may, might, must]   # a probe starting with one of these is a yes/no question -> dropped
 probe_banned_patterns: ["\\bstill\\b", "\\bany ?more\\b", "\\bany longer\\b", "\\bno longer\\b", "\\bnow\\b",
                         "\\bnowadays\\b", "\\bthese days\\b", "\\byet\\b"]   # change-hinting words -> probe dropped
+probe_generic_words: [what, which, where, how, who, when, whom, whose, does, do, did, is, are, was, were, the, a, an,
+                      user, s, their, they, have, has, had, own, owns, get, gets, use, uses, take, takes, like, likes,
+                      prefer, prefers, want, wants, need, needs]  # a probe made only of these is over-generic -> dropped
 probe_max_tokens: 4096  # reasoning model: a 15-memory store used 1671 reasoning + ~200 JSON tokens; 2048 truncated
 judge_max_tokens: 1024
 cue_max_tokens: 1024      # dependency causal-cue call
