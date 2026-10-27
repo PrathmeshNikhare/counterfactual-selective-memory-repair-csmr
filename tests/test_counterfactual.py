@@ -264,6 +264,19 @@ def test_malformed_probes_fall_back_to_templates(monkeypatch):
     assert llm.stats()["fallbacks"] == {"probes": 3}
 
 
+def test_truncated_probe_response_falls_back_to_templates(monkeypatch):
+    sc = load_scenario("data/dev/car_sale.json")
+    store = InMemoryAdapter(sc.memories)
+    truncated = '{"change_question":"How does the user commute to work?","memory_questions":{"M1":"What does'
+    monkeypatch.setattr(llm, "_complete", lambda *a, **k: truncated)  # max_tokens hit mid-JSON, on both attempts
+    monkeypatch.setattr(llm, "_get_cache", lambda cfg: {})
+    llm.reset_stats()
+    assert cf.generate_probes(DELTA, sc.observation, {"M1": _c("M1", 0, 1, 1, True)}, store, 6) == [
+        f"What is the current state of this: {store.get('M1').text.rstrip('. ')}?"]
+    assert llm.stats()["fallbacks"] == {"probes": 1}
+    assert CFG["probe_max_tokens"] >= 4096  # 2048 truncated a 15-memory store (1671 reasoning tokens)
+
+
 def test_probe_missing_memory_question_not_a_fallback(monkeypatch):
     sc = load_scenario("data/dev/car_sale.json")
     monkeypatch.setattr(llm, "call", lambda p, **k: {"change_question": "D?", "memory_questions": {}})

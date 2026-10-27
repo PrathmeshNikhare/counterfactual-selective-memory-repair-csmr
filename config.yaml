@@ -86,7 +86,7 @@ probe_yes_no_starts: [is, are, was, were, am, do, does, did, has, have, had, can
                       may, might, must]   # a probe starting with one of these is a yes/no question -> dropped
 probe_banned_patterns: ["\\bstill\\b", "\\bany ?more\\b", "\\bany longer\\b", "\\bno longer\\b", "\\bnow\\b",
                         "\\bnowadays\\b", "\\bthese days\\b", "\\byet\\b"]   # change-hinting words -> probe dropped
-probe_max_tokens: 2048  # reasoning model needs headroom before the JSON
+probe_max_tokens: 4096  # reasoning model: a 15-memory store used 1671 reasoning + ~200 JSON tokens; 2048 truncated
 judge_max_tokens: 1024
 cue_max_tokens: 1024      # dependency causal-cue call
 rewrite_max_tokens: 1024  # REVISE text / CONDITIONAL condition calls
