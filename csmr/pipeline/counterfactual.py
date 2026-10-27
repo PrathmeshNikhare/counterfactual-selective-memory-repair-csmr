@@ -38,6 +38,7 @@ Stored memories:
 Return JSON only: {{"change_question": "...", "memory_questions": {{"<memory id>": "..."}}}}"""
 
 JUDGE_PROMPT = """New fact ({time}): "{obs}" ({statement})
+Stored memory the question was written from: "{source}"
 
 Question: {question}
 Assistant answer: {answer}
@@ -49,6 +50,10 @@ Decide in two steps.
    previous ("it used X before; the current method is unknown", "previously had X") is NOT asserting it.
    - "contradicts" (0.0): the answer asserts something the new fact contradicts OR makes likely outdated, as the
      current state (e.g. it still states a fact that held only because of the old state).
+     It is also "contradicts" if the answer still asserts the part of the stored memory that the new fact makes false
+     or likely outdated, even when the answer leaves out the specific detail (e.g. stored memory "The user buys
+     sourdough from a bakery in Lisbon", new fact "The user left Lisbon and lives in Oslo", answer "The user buys
+     sourdough from a bakery." -> contradicts).
      This applies whatever determined_by_change is.
    - "consistent" (1.0): the answer is correct given the new fact. If determined_by_change is false, "unknown" or an
      uncertain answer is consistent.
@@ -74,30 +79,66 @@ def _change_hinting(q: str, cfg: dict) -> bool:
             or any(re.search(p, q.lower()) for p in cfg["probe_banned_patterns"]))
 
 
+def _norm(q: str) -> str:
+    """Duplicate key: case- and whitespace-insensitive."""
+    return " ".join(q.casefold().split())
+
+
+def _pick(qs: list[tuple[str, str | None]], cands: dict[str, CandidateInfo], store: MemoryStoreAdapter,
+          n: int) -> list[dict]:
+    """First probe of every candidate proposed for a non-KEEP action (even beyond n), then the rest in order up to n."""
+    must: dict[str, int] = {}
+    for i, (_, m) in enumerate(qs):
+        if m and cands[m].proposed != Action.KEEP:
+            must.setdefault(m, i)
+    rest = [i for i in range(len(qs)) if i not in must.values()][:max(n - len(must), 0)]
+    return [{"question": q, "source": m, "source_text": store.get(m).text if m else ""}
+            for q, m in (qs[i] for i in sorted([*must.values(), *rest]))]
+
+
 def generate_probes(delta: StateChange, obs: Observation, cands: dict[str, CandidateInfo],
-                    store: MemoryStoreAdapter, n: int, cfg: dict | None = None) -> list[str]:
+                    store: MemoryStoreAdapter, n: int, cfg: dict | None = None) -> tuple[list[dict], dict[str, str]]:
     """One neutral probe about the root fact's current value (first candidate in order if there is no root), then
-    one per candidate (roots/closest hops first, KEEP included), presupposing, yes/no and change-hinting probes
-    dropped, capped at n.
+    one per candidate (roots/closest hops first, KEEP included); presupposing, yes/no, change-hinting and duplicate
+    probes dropped; every candidate proposed for a non-KEEP action keeps one probe, other slots fill in order up to n.
+    Returns (probes, gaps): probes are {"question", "source", "source_text"} (source = the memory the probe was written
+    from; the change probe's is the root); gaps maps a non-KEEP-proposed candidate left without a probe to
+    "missing" | "filtered" | "duplicate".
     The attribute key is never shown: probes name the subject as the memory text does."""
     cfg = cfg or load_config()
     mems = "\n".join(f"- {m}: {store.get(m).text}" for m in cands)
     order = sorted(cands, key=lambda m: (not cands[m].is_root, -cands[m].p_dep, int(re.sub(r"\D", "", m) or 0), m))
-    fact = " ".join(store.get(m).text for m in ([m for m in order if cands[m].is_root] or order[:1]))
+    fact_ids = [m for m in order if cands[m].is_root] or order[:1]
+    fact = " ".join(store.get(m).text for m in fact_ids)
     out = llm.try_json(PROBE_PROMPT.format(fact=fact, memories=mems), max_tokens=cfg["probe_max_tokens"], cfg=cfg)
     # templates are built from memory text only, so they are never filtered (a "now"/"still" there is the memory's own)
-    templates = [PROBE_FALLBACK.format(text=store.get(m).text.rstrip(". ")) for m in order]
+    templates = [(PROBE_FALLBACK.format(text=store.get(m).text.rstrip(". ")), m) for m in order]
+    templates = [t for i, t in enumerate(templates) if _norm(t[0]) not in {_norm(u[0]) for u in templates[:i]}]
     if (out is None or not str(out.get("change_question") or "").strip()
             or not isinstance(out.get("memory_questions"), dict)):
         llm.fallback("probes", "malformed response; one template probe per candidate")
-        return templates[:n]
+        return _pick(templates, cands, store, n), {}
     per_mem = out["memory_questions"]
-    qs = [str(out["change_question"]).strip()] + [str(per_mem[m]).strip() for m in order if m in per_mem]
-    kept = [q for q in qs if not _presupposes(q, obs, cands, store) and not _change_hinting(q, cfg)]
+    lost = {m: "missing" for m in order if m not in per_mem}
+    kept: list[tuple[str, str | None]] = []
+    seen: set[str] = set()
+    raw = [(str(out["change_question"]).strip(), fact_ids[0] if fact_ids else None)]
+    for q, m in raw + [(str(per_mem[m]).strip(), m) for m in order if m in per_mem]:
+        key = _norm(q)
+        if _presupposes(q, obs, cands, store) or _change_hinting(q, cfg):
+            lost.setdefault(m, "filtered")
+        elif key in seen:
+            lost.setdefault(m, "duplicate")
+        else:
+            seen.add(key)
+            kept.append((q, m))
     if not kept:
         llm.fallback("probes", "every probe filtered out; one template probe per candidate")
-        return templates[:n]
-    return kept[:n]
+        return _pick(templates, cands, store, n), {}
+    probes = _pick(kept, cands, store, n)
+    covered = {p["source"] for p in probes}
+    gaps = {m: lost[m] for m in order if cands[m].proposed != Action.KEEP and m not in covered}
+    return probes, gaps
 
 
 def _unknown_like(ans: str, cfg: dict) -> bool:
@@ -109,13 +150,15 @@ def _unknown_like(ans: str, cfg: dict) -> bool:
     return any(re.search(p, a) if short else re.match(p, a) for p in cfg["unknown_patterns"])
 
 
-def judge(ans: str, question: str, delta: StateChange, obs: Observation, cfg: dict) -> dict:
+def judge(ans: str, question: str, delta: StateChange, obs: Observation, cfg: dict, source_text: str = "") -> dict:
     """Two-step judge in one call; returns {"determined_by_change", "verdict", "score"} (Spec 10).
+    source_text: the (pre-commit) memory the probe was written from, so a stale claim is caught even if the answer
+    drops the outdated detail.
     Unknown-like answers get their verdict from determined_by_change in code, not from the LLM.
     A malformed response is retried once; if still malformed the verdict is "vague" (determined_by_change None)."""
     unknown = _unknown_like(ans, cfg)
     prompt = JUDGE_PROMPT.format(time=obs.time[:10], obs=obs.text, statement=delta.statement or obs.text,
-                                 question=question, answer=ans)
+                                 source=source_text or "(none)", question=question, answer=ans)
     for p in (prompt, prompt + RETRY_NUDGE):
         out = llm.try_json(p, model=cfg["llm"]["judge_model"], max_tokens=cfg["judge_max_tokens"], cfg=cfg)
         if out is not None and isinstance(out.get("determined_by_change"), bool) and (
@@ -146,17 +189,19 @@ def prepare_texts(repair_sets: list[RepairSet], store: MemoryStoreAdapter, delta
     return revised, conditions
 
 
-def _evaluate(rs: RepairSet, probes: list[str], store: MemoryStoreAdapter, revised: dict[str, str],
+def _evaluate(rs: RepairSet, probes: list[dict], store: MemoryStoreAdapter, revised: dict[str, str],
               conditions: dict[str, str], cands: dict[str, CandidateInfo], delta: StateChange, obs: Observation,
               cfg: dict, cache: dict, new_mem: Memory | None) -> tuple[dict[str, float], list[dict]]:
     mems = view(store, rs, revised, conditions, new_mem)
     vhash = hashlib.sha256(json.dumps([(m.id, m.text) for m in mems]).encode()).hexdigest()
     details = []
-    for q in probes:  # identical views reuse answers/judgements
-        if (q, vhash) not in cache:
+    for p in probes:  # identical views reuse answers/judgements
+        q, key = p["question"], (p["question"], p["source_text"], vhash)
+        if key not in cache:
             a = answer(q, mems, cfg=cfg)
-            cache[(q, vhash)] = {"question": q, "answer": a, **judge(a, q, delta, obs, cfg)}
-        details.append(cache[(q, vhash)])
+            cache[key] = {"question": q, "source": p["source"], "answer": a,
+                          **judge(a, q, delta, obs, cfg, p["source_text"])}
+        details.append(cache[key])
     vals = [d["score"] for d in details]
     benefit = sum(vals) / len(vals) if vals else 0.0
     collateral = sum(1 - cands[m].p_dep for m, a in rs.actions.items() if a in MODIFYING_ACTIONS)
@@ -170,7 +215,7 @@ def _evaluate(rs: RepairSet, probes: list[str], store: MemoryStoreAdapter, revis
              "total": total}, details)
 
 
-def score(rs: RepairSet, probes: list[str], store: MemoryStoreAdapter, revised: dict[str, str],
+def score(rs: RepairSet, probes: list[dict], store: MemoryStoreAdapter, revised: dict[str, str],
           conditions: dict[str, str], cands: dict[str, CandidateInfo], delta: StateChange, obs: Observation,
           cfg: dict, cache: dict | None = None, new_mem: Memory | None = None) -> dict[str, float]:
     """total = benefit - lc*collateral - le*evidence_cost - ls*|R|  (Section V)."""
@@ -178,7 +223,7 @@ def score(rs: RepairSet, probes: list[str], store: MemoryStoreAdapter, revised: 
     return _evaluate(rs, probes, store, revised, conditions, cands, delta, obs, cfg, cache, new_mem)[0]
 
 
-def select(repair_sets: list[RepairSet], probes: list[str], store: MemoryStoreAdapter, revised: dict[str, str],
+def select(repair_sets: list[RepairSet], probes: list[dict], store: MemoryStoreAdapter, revised: dict[str, str],
            conditions: dict[str, str], cands: dict[str, CandidateInfo], delta: StateChange, obs: Observation,
            cfg: dict, new_mem: Memory | None = None) -> tuple[RepairSet, list[dict]]:
     """argmax of total over feasible sets, ties -> smaller |R|. Returns (chosen, per-set trace rows)."""

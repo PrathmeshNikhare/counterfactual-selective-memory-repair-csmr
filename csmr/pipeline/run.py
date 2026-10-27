@@ -49,7 +49,8 @@ def run_pipeline(obs: Observation, store: MemoryStoreAdapter, cfg: dict | None =
     sets = generate_repair_sets(cands, {m: i.proposed for m, i in cands.items()}, cfg)
     new_mem = observation_memory(delta, obs, store)
     use_cf = cfg["ablation"]["use_counterfactual"]  # off: no probes, select() applies the proposed actions
-    trace.probes = cf.generate_probes(delta, obs, cands, store, cfg["n_probes"], cfg) if use_cf else []
+    trace.probes, trace.probe_gaps = cf.generate_probes(delta, obs, cands, store, cfg["n_probes"], cfg) if use_cf \
+        else ([], {})
     revised, conditions = cf.prepare_texts(sets, store, delta, obs, cfg)
     best, trace.repair_sets = cf.select(sets, trace.probes, store, revised, conditions, cands, delta, obs, cfg, new_mem)
     trace.chosen = best.name

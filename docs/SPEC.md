@@ -165,14 +165,18 @@ Retrieve top-k by cosine to the question from the given memory list; LLM answers
 ## 10. Counterfactual selection (`pipeline/counterfactual.py`) — Paper IV-D, V
 
 ```python
-def generate_probes(delta, obs, cands, store, n: int) -> list[str]   # LLM; from candidate memory texts ONLY
+def generate_probes(delta, obs, cands, store, n: int, cfg=None) -> tuple[list[dict], dict[str, str]]   # LLM; from candidate memory texts ONLY
+# Returns (probes, gaps). Each probe is {"question", "source", "source_text"}: the candidate memory it was written from (the change_question's source is the root, or the first candidate if there is no root) and that memory's pre-commit text.
 # NEUTRAL questions about the user's CURRENT state ("What does the user grow in their garden?"), never mentioning or presupposing the change.
 # Each probe is the question its memory (the fact, for the change_question) directly answers, about the memory's MAIN PREDICATE, phrased so it does not assume the memory's claim is true ("The user grows tomatoes in their garden" -> "What does the user grow in their garden?", not "Which tomato variety does the user grow?").
 # Prompt examples use no wording from dev/showcase scenarios or their gold questions.
 # One "change_question" about the CURRENT value of the root fact (root memory text(s); the first candidate in order if there is no root), then one per candidate (KEEP-proposed included, so over-repair is detectable), roots first, then by P_dep descending, ties by numeric memory id (never string order: "M12" must not outrank "M2"); capped at n (config n_probes=6).
+# Coverage: duplicate questions (case/whitespace-insensitive; template fallback probes too) are dropped, first kept. The first probe of every candidate proposed for a non-KEEP action is always kept (even beyond n); remaining slots fill in the order above up to n.
+# gaps (Trace.probe_gaps): every non-KEEP-proposed candidate left without a probe -> "missing" (LLM gave none) | "filtered" (presupposing / yes-no / change-hinting) | "duplicate".
 # Probes using a word only the observation introduces (e.g. "sold") are dropped.
 # Probes are open questions (what/which/where/how/who): LLM probes starting with a yes/no word (cfg.probe_yes_no_starts) or containing a change-hinting word (cfg.probe_banned_patterns: "still", "anymore", "no longer", ...) are dropped. If no LLM probe survives, the template fallback probes (below) are used and a "probes" fallback is recorded.
-def judge(answer: str, question: str, delta, obs, cfg) -> dict       # ONE call, two explicit steps:
+def judge(answer: str, question: str, delta, obs, cfg, source_text: str = "") -> dict       # ONE call, two explicit steps:
+# The prompt shows the probe's source memory (source_text). If the answer still asserts the part of that memory the change makes false or likely outdated, the verdict is "contradicts" even when the answer omits the specific detail (prompt example uses wording unrelated to any scenario).
 # {"determined_by_change": bool, "verdict": "consistent"|"vague"|"contradicts"} -> score 1.0 / 0.5 / 0.0
 #   determined_by_change=false: "unknown"/uncertain answers are consistent (1.0)
 #   determined_by_change=true:  "unknown"/vague is vague (0.5)
@@ -195,7 +199,8 @@ EvidenceCost  = (#VERIFY actions in rs) * cfg.verify_cost + llm_calls_for_rs * c
 |R|           = number of non-KEEP actions
 ```
 - argmax over feasible sets; ties → smaller |R|.
-- Cache answers by (question, hash of view) — identical views reuse results.
+- Cache answers by (question, source_text, hash of view) — identical views reuse results.
+- Commit validation re-judges each probe with the same pre-commit source_text.
 - Malformed LLM JSON never crashes a run; each fallback is counted in `Trace.llm_stats["fallbacks"]` (`llm.fallback(kind)`): extract (missing/invalid keys) → no state change; probes (missing/invalid) → one template probe per candidate, "What is the current state of this: <memory text>?" (built from memory text only, so never filtered); judge → retried once with a changed prompt, then verdict "vague" (0.5), `determined_by_change` null.; causal cue (dependency) → retried once, then "no"; REVISE text → retried once, then template "Previously: <text>. Possibly outdated after: <statement>"; CONDITIONAL condition → retried once, then "it is not affected by: <statement>" (kinds `causal_cue`, `revise_text`, `condition_text`).
 - Ties: totals within `cfg.tie_eps` are tied → smaller |R|. Token budgets: `cfg.probe_max_tokens`, `cfg.judge_max_tokens`.
 - Ablation `use_counterfactual=false`: select R3 (apply all proposed actions) without probes.

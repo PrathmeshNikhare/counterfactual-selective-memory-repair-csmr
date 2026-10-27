@@ -106,7 +106,8 @@ class Trace:
     note: Optional[dict] = None     # {entity, attribute, statement} of the observation (Spec 2), used when Δ is None
     roots: list[str] = field(default_factory=list)
     candidates: dict[str, dict] = field(default_factory=dict)
-    probes: list[str] = field(default_factory=list)
+    probes: list[dict] = field(default_factory=list)  # {"question", "source" (memory id), "source_text"}
+    probe_gaps: dict[str, str] = field(default_factory=dict)  # non-KEEP-proposed id -> missing | filtered | duplicate
     repair_sets: list[dict] = field(default_factory=list)
     chosen: Optional[str] = None
     final_actions: dict[str, str] = field(default_factory=dict)

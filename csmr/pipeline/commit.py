@@ -38,12 +38,14 @@ def commit(store: MemoryStoreAdapter, rs, revised: dict[str, str], conditions: d
     return transitions
 
 
-def validate(store: MemoryStoreAdapter, probes: list[str], delta: StateChange, obs: Observation,
+def validate(store: MemoryStoreAdapter, probes: list[dict], delta: StateChange, obs: Observation,
              expected_benefit: float, cfg: dict | None = None) -> dict:
-    """Re-run the probes on the committed store; warn if benefit differs from the selection-time estimate."""
+    """Re-run the probes on the committed store; warn if benefit differs from the selection-time estimate.
+    The judge gets each probe's pre-commit source_text, as during selection."""
     cfg = cfg or load_config()
     mems = [r for m in store.all() if (r := render(m))]  # same rendering as overlay.view()
-    scores = [judge(answer(q, mems, cfg=cfg), q, delta, obs, cfg)["score"] for q in probes]
+    scores = [judge(answer(p["question"], mems, cfg=cfg), p["question"], delta, obs, cfg, p["source_text"])["score"]
+              for p in probes]
     benefit = sum(scores) / len(scores) if scores else 0.0
     ok = abs(benefit - expected_benefit) <= cfg["validation_tol"]
     if not ok:

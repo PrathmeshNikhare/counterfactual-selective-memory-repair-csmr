@@ -17,6 +17,11 @@ DELTA = StateChange("user", "vehicle_ownership", "owns a car", "no car", "2026-0
                     "The user sold their car.", "remove")
 
 
+def _qs(out):
+    """Questions of a generate_probes() result."""
+    return [p["question"] for p in out[0]]
+
+
 def _c(mid, hop, p, s, root=False):
     return CandidateInfo(memory_id=mid, hop=hop, retrieved_by="root" if root else "hop", is_root=root, p_dep=p, s_evidence=s)
 
@@ -32,7 +37,7 @@ def _setup(monkeypatch):
     # fake agent returns the whole view; fake judge checks which stale facts survive
     monkeypatch.setattr(cf, "answer", lambda q, mems, **k: " ".join(m.text for m in mems))
 
-    def fake_judge(a, q, d, o, cfg):
+    def fake_judge(a, q, d, o, cfg, src=""):
         if "own" in q:
             v = "contradicts" if "owns a car" in a else "consistent"
         elif "commute" in q:
@@ -42,7 +47,8 @@ def _setup(monkeypatch):
         return {"determined_by_change": True, "verdict": v, "score": cf.VERDICT_SCORE[v]}
 
     monkeypatch.setattr(cf, "judge", fake_judge)
-    probes = ["What vehicle does the user own?", "How does the user commute?", "What does the user spend on fuel?"]
+    probes = [{"question": q, "source": m, "source_text": ""} for q, m in (("What vehicle does the user own?", "M1"),
+              ("How does the user commute?", "M2"), ("What does the user spend on fuel?", "M3"))]
     return store, cands, sets, revised, probes, sc.observation
 
 
@@ -98,7 +104,7 @@ def test_select_rows_carry_judge_fields(monkeypatch):
     store, cands, sets, revised, probes, obs = _setup(monkeypatch)
     _, rows = cf.select(sets, probes, store, revised, {}, cands, DELTA, obs, CFG)
     j = next(r for r in rows if r["name"] == "R2")["judgements"]
-    assert [x["question"] for x in j] == probes
+    assert [x["question"] for x in j] == [p["question"] for p in probes]
     assert all({"answer", "determined_by_change", "verdict", "score"} <= set(x) for x in j)
 
 
@@ -109,7 +115,7 @@ def test_presupposing_probes_rejected(monkeypatch):
         "change_question": "What vehicle does the user own?",
         "memory_questions": {"M1": "What will the user do after they sold the car?",
                              "M2": "How does the user commute to work?"}})
-    qs = cf.generate_probes(DELTA, sc.observation, cands, InMemoryAdapter(sc.memories), 6)
+    qs = _qs(cf.generate_probes(DELTA, sc.observation, cands, InMemoryAdapter(sc.memories), 6))
     assert qs == ["What vehicle does the user own?", "How does the user commute to work?"]
 
 
@@ -124,7 +130,7 @@ def test_yes_no_and_change_hinting_probes_rejected(monkeypatch):
                              "M3": "Where does the user no longer park?",
                              "M4": "What does the user spend on fuel anymore?",
                              "M5": "In which city does the user drive?"}})
-    qs = cf.generate_probes(DELTA, sc.observation, cands, InMemoryAdapter(sc.memories), 9)
+    qs = _qs(cf.generate_probes(DELTA, sc.observation, cands, InMemoryAdapter(sc.memories), 9))
     assert qs == ["Which vehicle does the user own?", "In which city does the user drive?"]
 
 
@@ -133,7 +139,7 @@ def test_template_probe_with_hint_word_kept(monkeypatch):
     obs = load_scenario("data/dev/car_sale.json").observation
     llm.reset_stats()
     monkeypatch.setattr(llm, "call", lambda p, **k: {})  # malformed -> template, which mentions "now" from the memory
-    assert cf.generate_probes(DELTA, obs, {"M1": _c("M1", 0, 1, 1, True)}, store, 6) == [
+    assert _qs(cf.generate_probes(DELTA, obs, {"M1": _c("M1", 0, 1, 1, True)}, store, 6)) == [
         "What is the current state of this: The user now lives in Pune?"]
     assert llm.stats()["fallbacks"] == {"probes": 1}
 
@@ -146,7 +152,7 @@ def test_all_llm_probes_filtered_falls_back_to_templates(monkeypatch):
         "change_question": "Does the user own a car?",
         "memory_questions": {"M1": "Is the car still owned?", "M2": "How does the user commute after they sold it?"}})
     llm.reset_stats()
-    assert cf.generate_probes(DELTA, sc.observation, cands, store, 6) == [
+    assert _qs(cf.generate_probes(DELTA, sc.observation, cands, store, 6)) == [
         f"What is the current state of this: {store.get(m).text.rstrip('. ')}?" for m in ("M1", "M2")]
     assert llm.stats()["fallbacks"] == {"probes": 1}
 
@@ -185,8 +191,8 @@ def test_generate_probes_delta_plus_one_per_candidate_capped(monkeypatch):
     monkeypatch.setattr(llm, "call", lambda p, **k: {"change_question": "D?", "memory_questions":
                                                      {"M4": "q4", "M2": "q2", "M1": "q1", "M9": "junk"}})
     store = InMemoryAdapter(sc.memories)
-    assert cf.generate_probes(DELTA, sc.observation, cands, store, 6) == ["D?", "q1", "q2", "q4"]
-    assert cf.generate_probes(DELTA, sc.observation, cands, store, 2) == ["D?", "q1"]
+    assert _qs(cf.generate_probes(DELTA, sc.observation, cands, store, 6)) == ["D?", "q1", "q2", "q4"]
+    assert _qs(cf.generate_probes(DELTA, sc.observation, cands, store, 2)) == ["D?", "q1"]
 
 
 def test_observation_memory_in_every_view(monkeypatch):
@@ -209,7 +215,7 @@ def test_car_real_llm_prefers_r2():
              "M4": _c("M4", 2, 0.1, 0.9)}
     prop = {m: actions.propose_action(m, c, CFG, "remove") for m, c in cands.items()}
     sets = generate_repair_sets(cands, prop, CFG)
-    probes = cf.generate_probes(DELTA, sc.observation, cands, store, CFG["n_probes"])
+    probes, _ = cf.generate_probes(DELTA, sc.observation, cands, store, CFG["n_probes"])
     revised, conds = cf.prepare_texts(sets, store, DELTA, sc.observation)
     best, rows = cf.select(sets, probes, store, revised, conds, cands, DELTA, sc.observation, CFG,
                            observation_memory(DELTA, sc.observation, store))
@@ -259,7 +265,7 @@ def test_malformed_probes_fall_back_to_templates(monkeypatch):
     llm.reset_stats()
     for bad in ({}, {"change_question": ""}, {"change_question": "q?", "memory_questions": "oops"}):
         monkeypatch.setattr(llm, "call", lambda p, **k: bad)
-        qs = cf.generate_probes(DELTA, sc.observation, cands, store, 6)
+        qs = _qs(cf.generate_probes(DELTA, sc.observation, cands, store, 6))
         assert qs == [f"What is the current state of this: {store.get(m).text.rstrip('. ')}?" for m in ("M1", "M2")]
     assert llm.stats()["fallbacks"] == {"probes": 3}
 
@@ -271,7 +277,7 @@ def test_truncated_probe_response_falls_back_to_templates(monkeypatch):
     monkeypatch.setattr(llm, "_complete", lambda *a, **k: truncated)  # max_tokens hit mid-JSON, on both attempts
     monkeypatch.setattr(llm, "_get_cache", lambda cfg: {})
     llm.reset_stats()
-    assert cf.generate_probes(DELTA, sc.observation, {"M1": _c("M1", 0, 1, 1, True)}, store, 6) == [
+    assert _qs(cf.generate_probes(DELTA, sc.observation, {"M1": _c("M1", 0, 1, 1, True)}, store, 6)) == [
         f"What is the current state of this: {store.get('M1').text.rstrip('. ')}?"]
     assert llm.stats()["fallbacks"] == {"probes": 1}
     assert CFG["probe_max_tokens"] >= 4096  # 2048 truncated a 15-memory store (1671 reasoning tokens)
@@ -281,8 +287,8 @@ def test_probe_missing_memory_question_not_a_fallback(monkeypatch):
     sc = load_scenario("data/dev/car_sale.json")
     monkeypatch.setattr(llm, "call", lambda p, **k: {"change_question": "D?", "memory_questions": {}})
     llm.reset_stats()
-    assert cf.generate_probes(DELTA, sc.observation, {"M1": _c("M1", 0, 1, 1, True)},
-                              InMemoryAdapter(sc.memories), 6) == ["D?"]
+    assert _qs(cf.generate_probes(DELTA, sc.observation, {"M1": _c("M1", 0, 1, 1, True)},
+                              InMemoryAdapter(sc.memories), 6)) == ["D?"]
     assert llm.stats()["fallbacks"] == {}
 
 
@@ -364,7 +370,7 @@ def test_probe_order_roots_then_p_dep_then_numeric_id(monkeypatch):
              "M3": _c("M3", 1, .5, .9)}
     qs = {m: f"q{m}" for m in cands}
     monkeypatch.setattr(llm, "call", lambda p, **k: {"change_question": "D?", "memory_questions": qs})
-    out = cf.generate_probes(DELTA, sc.observation, cands, InMemoryAdapter(sc.memories), 9)
+    out = _qs(cf.generate_probes(DELTA, sc.observation, cands, InMemoryAdapter(sc.memories), 9))
     assert out == ["D?", "qM1", "qM2", "qM3", "qM12"]  # root first; higher p_dep next; ties by numeric id
 
 
@@ -427,3 +433,79 @@ def test_probe_prompt_names_subject_not_attribute_key(monkeypatch):
     assert "Name the specific subject exactly as the memory text names it" in p
     cf.generate_probes(DB, obs, {"M11": _c("M11", 1, .3, .9)}, store, 6)  # no root: first candidate is the fact
     assert "stored fact: \"The user's side project stores data in SQLite.\"" in seen[1]
+
+
+def test_judge_prompt_carries_source_memory_and_omitted_detail_rule(monkeypatch):
+    sc = load_scenario("data/dev/car_sale.json")
+    seen = []
+    monkeypatch.setattr(llm, "call", lambda p, **k: seen.append(p) or {"determined_by_change": True,
+                                                                      "verdict": "contradicts"})
+    out = cf.judge("The user drives to work.", "How does the user get to work?", DELTA, sc.observation, CFG,
+                   "The user drives to work by car.")
+    assert out["verdict"] == "contradicts"
+    p = " ".join(seen[0].split())
+    assert 'Stored memory the question was written from: "The user drives to work by car."' in p
+    assert "still asserts the part of the stored memory that the new fact makes false or likely outdated" in p
+    assert "even when the answer leaves out the specific detail" in p and "sourdough" in p
+    cf.judge("x", "q", DELTA, sc.observation, CFG)  # no source given
+    assert 'written from: "(none)"' in seen[1]
+
+
+def test_select_and_validate_pass_source_text_to_judge(monkeypatch):
+    from csmr.pipeline import commit as C
+    store, cands, sets, revised, probes, obs = _setup(monkeypatch)
+    probes = [{**p, "source_text": store.get(p["source"]).text} for p in probes]
+    got = []
+    monkeypatch.setattr(cf, "judge", lambda a, q, d, o, cfg, src="": got.append((q, src)) or
+                        {"determined_by_change": False, "verdict": "consistent", "score": 1.0})
+    _, rows = cf.select(sets, probes, store, revised, {}, cands, DELTA, obs, CFG)
+    assert set(got) == {(p["question"], p["source_text"]) for p in probes}
+    assert [x["source"] for x in next(r for r in rows if r["name"] == "R2")["judgements"]] == ["M1", "M2", "M3"]
+    got.clear()
+    monkeypatch.setattr(C, "answer", lambda q, m, **k: "unknown")
+    monkeypatch.setattr(C, "judge", lambda a, q, d, o, cfg, src="": got.append((q, src)) or {"score": 1.0})
+    C.validate(store, probes, DELTA, obs, 1.0, CFG)
+    assert got == [(p["question"], p["source_text"]) for p in probes]
+
+
+def test_probe_coverage_dedup_guarantee_and_gaps(monkeypatch):
+    sc = load_scenario("data/dev/car_sale_distractors.json")
+    store = InMemoryAdapter(sc.memories)
+    cands = {"M1": _c("M1", 0, 1.0, .9, True), "M12": _c("M12", 1, .95, .9), "M13": _c("M13", 1, .94, .9),
+             "M2": _c("M2", 1, .5, .9), "M3": _c("M3", 1, .4, .9), "M4": _c("M4", 1, .3, .9), "M6": _c("M6", 1, .2, .9)}
+    for m in ("M1", "M2", "M3", "M4", "M6"):
+        cands[m].proposed = Action.REVISE  # M12, M13 stay KEEP
+    monkeypatch.setattr(llm, "call", lambda p, **k: {
+        "change_question": "What does the user own?",
+        "memory_questions": {"M1": "what does  the user OWN?",          # duplicate of the change question
+                             "M12": "When does the user work?", "M13": "When is the stand-up?",
+                             "M2": "How does the user get to the office?",
+                             "M3": "Does the user spend money on fuel?",  # yes/no -> filtered
+                             "M4": "What does the user prefer?"}})        # M6: missing
+    probes, gaps = cf.generate_probes(DELTA, sc.observation, cands, store, 3)
+    assert [(p["question"], p["source"]) for p in probes] == [
+        ("What does the user own?", "M1"),  # change probe: source is the root
+        ("How does the user get to the office?", "M2"), ("What does the user prefer?", "M4")]
+    assert probes[0]["source_text"] == store.get("M1").text
+    assert gaps == {"M3": "filtered", "M6": "missing"}  # M1 is covered by the change probe, so not a gap
+    probes, _ = cf.generate_probes(DELTA, sc.observation, cands, store, 5)  # spare slots fill in p_dep order
+    assert [p["source"] for p in probes] == ["M1", "M12", "M13", "M2", "M4"]
+
+
+def test_probe_duplicate_of_other_memory_is_a_gap(monkeypatch):
+    sc = load_scenario("data/dev/car_sale.json")
+    cands = {"M1": _c("M1", 0, 1.0, .9, True), "M2": _c("M2", 1, .9, .9)}
+    cands["M2"].proposed = Action.REVISE
+    monkeypatch.setattr(llm, "call", lambda p, **k: {"change_question": "How does the user get to work?",
+                                                     "memory_questions": {"M2": "How does the user get to work?"}})
+    probes, gaps = cf.generate_probes(DELTA, sc.observation, cands, InMemoryAdapter(sc.memories), 6)
+    assert [p["source"] for p in probes] == ["M1"] and gaps == {"M2": "duplicate"}
+
+
+def test_template_fallback_drops_duplicate_texts(monkeypatch):
+    store = InMemoryAdapter([Memory("M1", "The user owns a kayak.", "user", "boat", "2026-03-02"),
+                             Memory("M2", "The user owns a kayak.", "user", "boat", "2026-03-03")])
+    obs = load_scenario("data/dev/car_sale.json").observation
+    monkeypatch.setattr(llm, "call", lambda p, **k: {})  # malformed -> templates
+    probes, _ = cf.generate_probes(DELTA, obs, {"M1": _c("M1", 0, 1, 1, True), "M2": _c("M2", 1, .9, .9)}, store, 6)
+    assert [p["source"] for p in probes] == ["M1"]

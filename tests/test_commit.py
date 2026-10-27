@@ -33,9 +33,10 @@ def test_validate_warns_on_mismatch(monkeypatch):
     monkeypatch.setattr(C, "answer", lambda q, m, **k: "unknown")
     monkeypatch.setattr(C, "judge", lambda *a: {"score": 1.0})
     cfg = {"validation_tol": 0.01}
-    assert C.validate(store, ["q"], delta, obs, 1.0, cfg)["ok"]
+    probes = [{"question": "q", "source": "M1", "source_text": "old text"}]
+    assert C.validate(store, probes, delta, obs, 1.0, cfg)["ok"]
     with pytest.warns(UserWarning):
-        assert not C.validate(store, ["q"], delta, obs, 0.5, cfg)["ok"]
+        assert not C.validate(store, probes, delta, obs, 0.5, cfg)["ok"]
 
 
 def test_committed_render_matches_overlay_view():
@@ -66,7 +67,7 @@ def test_car_phases_a_to_e_real_llm():
     evidence.assess_evidence(c, store, delta, sc.observation)
     prop = {m: propose_action(m, i, cfg, delta.change_type) for m, i in c.items()}
     sets = generate_repair_sets(c, prop, cfg)
-    probes = cf.generate_probes(delta, sc.observation, c, store, cfg["n_probes"])
+    probes, _ = cf.generate_probes(delta, sc.observation, c, store, cfg["n_probes"])
     revised, conds = cf.prepare_texts(sets, store, delta, sc.observation)
     nm = observation_memory(delta, sc.observation, store)
     best, _ = cf.select(sets, probes, store, revised, conds, c, delta, sc.observation, cfg, nm)

@@ -26,7 +26,7 @@ def _llm(revise):
     return call
 
 
-def _fake_judge(a, q, d, o, cfg):
+def _fake_judge(a, q, d, o, cfg, src=""):
     if "own" in q:
         v = "contradicts" if "owns a car" in a else "consistent"
     elif "commute" in q:
@@ -49,6 +49,7 @@ def _run(monkeypatch, revise):
 def test_car_end_to_end_stubbed(monkeypatch):
     t, store = _run(monkeypatch, {"text": "The user previously drove to work by car; commute now unknown."})
     assert t.roots == ["M1"] and t.chosen == "R2"
+    assert [p["source"] for p in t.probes] == ["M1", "M2", "M3"] and t.probe_gaps == {}
     # M3 REVISE (not Table II's VERIFY): dependents inherit the root's contradiction, Spec 5
     assert t.final_actions == {"M1": "REVOKE", "M2": "REVISE", "M3": "REVISE", "M4": "KEEP", "M5": "KEEP"}
     assert "M5" not in t.candidates and t.validation["ok"] and t.llm_stats["fallbacks"] == {}
