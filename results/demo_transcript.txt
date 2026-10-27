@@ -1,0 +1,13 @@
+25 memories loaded. State a change, or ask a question ('?' at the end).
+you> I own a car and drive to work every day
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights: 100%|███████████████████████████████████████████████| 103/103 [00:00<00:00, 9018.50it/s]
+stored OBS26: The user owns a car and drives to work every day.
+delta: no change
+you> I sold my car
+Loading weights: 100%|███████████████████████████████████████████████| 106/106 [00:00<00:00, 3783.31it/s]
+stored OBS27: The user sold their car.
+delta: user.vehicle_ownership: 'owns a car' -> 'does not own a car' (remove)
+chosen set: R2 | repairs: {'M1': 'REVOKE', 'M2': 'REVISE', 'M3': 'REVISE', 'M4': 'REVISE', 'OBS26': 'REVOKE'}
+you> How do I get to work?
+agent> unknown
