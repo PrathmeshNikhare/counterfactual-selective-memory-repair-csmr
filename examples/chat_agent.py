@@ -1,12 +1,13 @@
 """Terminal demo: a line ending in '?' is a question to the agent; any other line is an observation (CSMR repairs memory).
 
-    python examples/chat_agent.py [data/dev/car_sale_distractors.json] [--set lambda_s=0.01 ...]
+    python examples/chat_agent.py [data/dev/car_sale_distractors.json] [--set lambda_s=0.01 ...] [--time 2026-10-27T15:10:00]
 
 Type e.g. "I sold my car", then "how do I get to work?". Empty line / Ctrl-D quits.
 Gold labels in the scenario file are never read: only its memories seed the store.
 """
 import argparse
 import sys
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -24,6 +25,8 @@ def main() -> None:
     ap.add_argument("scenario", nargs="?", default="data/dev/car_sale_distractors.json")
     ap.add_argument("--set", action="append", default=[], dest="overrides", metavar="KEY=VALUE",
                     help="override a config value, dotted keys allowed (e.g. ablation.use_evidence=false)")
+    ap.add_argument("--time", type=lambda s: datetime.fromisoformat(s) and s, metavar="ISO",
+                    help="timestamp for every observation (default: now), e.g. to replay a cached run")
     args = ap.parse_args()
     sc = load_scenario(args.scenario)
     memories = sc.memories
@@ -40,7 +43,7 @@ def main() -> None:
         if line.endswith("?"):
             print("agent>", answer(line, csmr.retrieve_memories(line), cfg=csmr.cfg))
             continue
-        t = csmr.observe(line)
+        t = csmr.observe(line, time=args.time)
         for x in t.transitions:
             if x["action"] == "ADD":
                 print(f"stored {x['id']}: {csmr.store.get(x['id']).text}")
