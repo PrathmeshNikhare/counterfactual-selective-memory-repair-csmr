@@ -1,0 +1,248 @@
+{
+  "id": "showcase_sold_scooter",
+  "category": "one_hop",
+  "domain": "personal_assistant",
+  "note": "Turn 1 of the 3-turn life-updates story. Permanent removal: the scooter is revoked and everything tied to it is revised. Work, home and the dog are untouched.",
+  "memories": [
+    {
+      "id": "M1",
+      "text": "The user owns a Honda Activa scooter.",
+      "entity": "user",
+      "attribute": "vehicle_ownership",
+      "time": "2026-01-12T10:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M2",
+      "text": "The user rides their scooter to the Nimbus Tech office in Kharadi every weekday.",
+      "entity": "user",
+      "attribute": "commute",
+      "time": "2026-01-15T09:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M3",
+      "text": "The user's scooter insurance with ICICI Lombard renews every March.",
+      "entity": "user",
+      "attribute": "vehicle_insurance",
+      "time": "2026-03-02T11:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M4",
+      "text": "The user fills petrol for the scooter at the HP pump in Viman Nagar every Sunday.",
+      "entity": "user",
+      "attribute": "fuel_routine",
+      "time": "2026-02-08T10:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M5",
+      "text": "The user works as a product designer at Nimbus Tech's Kharadi office in Pune.",
+      "entity": "user",
+      "attribute": "work_location",
+      "time": "2026-01-10T10:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M6",
+      "text": "The user has lunch at the Kharadi office cafeteria on weekdays.",
+      "entity": "user",
+      "attribute": "lunch",
+      "time": "2026-02-03T13:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M7",
+      "text": "The user's team stand-up happens at 10:00 in a meeting room at the Kharadi office.",
+      "entity": "user",
+      "attribute": "meetings",
+      "time": "2026-02-10T10:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M8",
+      "text": "The user lives in a rented 2BHK flat in Viman Nagar, Pune.",
+      "entity": "user",
+      "attribute": "residence",
+      "time": "2026-01-05T10:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M9",
+      "text": "The user's flat lease in Viman Nagar ends in March 2027.",
+      "entity": "user",
+      "attribute": "lease",
+      "time": "2026-04-01T18:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M10",
+      "text": "The user walks their dog in the Viman Nagar park every evening.",
+      "entity": "user",
+      "attribute": "evening_routine",
+      "time": "2026-03-12T19:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M11",
+      "text": "The user's dog is a beagle named Coco.",
+      "entity": "user",
+      "attribute": "pets",
+      "time": "2026-03-12T19:05:00",
+      "source": "user"
+    },
+    {
+      "id": "M12",
+      "text": "The user prefers Figma for all design work.",
+      "entity": "user",
+      "attribute": "tools",
+      "time": "2026-02-01T11:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M13",
+      "text": "The user is learning Japanese and is preparing for the JLPT N4 exam.",
+      "entity": "user",
+      "attribute": "learning",
+      "time": "2026-05-20T21:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M14",
+      "text": "The user's sister lives in Mumbai and works as a lawyer.",
+      "entity": "user",
+      "attribute": "family",
+      "time": "2026-01-20T20:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M15",
+      "text": "The user is vegetarian.",
+      "entity": "user",
+      "attribute": "diet",
+      "time": "2026-01-08T13:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M16",
+      "text": "The user practises yoga at home every morning.",
+      "entity": "user",
+      "attribute": "morning_routine",
+      "time": "2026-02-15T07:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M17",
+      "text": "The user prefers aisle seats on flights.",
+      "entity": "user",
+      "attribute": "travel_preference",
+      "time": "2026-06-10T21:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M18",
+      "text": "The user's college friend Rohan lives in Bengaluru, and they meet whenever the user visits.",
+      "entity": "user",
+      "attribute": "friends",
+      "time": "2026-07-04T20:00:00",
+      "source": "user"
+    },
+    {
+      "id": "M19",
+      "text": "The user's work laptop is a MacBook Air issued by Nimbus Tech.",
+      "entity": "user",
+      "attribute": "devices",
+      "time": "2026-01-10T10:10:00",
+      "source": "user"
+    },
+    {
+      "id": "M20",
+      "text": "The user saves 20 percent of their salary in a recurring deposit.",
+      "entity": "user",
+      "attribute": "finances",
+      "time": "2026-04-05T10:00:00",
+      "source": "user"
+    }
+  ],
+  "observation": {
+    "text": "I sold my Activa yesterday, so no more scooter for me.",
+    "source": "user",
+    "time": "2026-10-26T10:00:00"
+  },
+  "gold": {
+    "actions": {
+      "M1": "REVOKE",
+      "M2": "REVISE",
+      "M3": "REVISE",
+      "M4": "REVISE",
+      "M5": "KEEP",
+      "M6": "KEEP",
+      "M7": "KEEP",
+      "M8": "KEEP",
+      "M9": "KEEP",
+      "M10": "KEEP",
+      "M11": "KEEP",
+      "M12": "KEEP",
+      "M13": "KEEP",
+      "M14": "KEEP",
+      "M15": "KEEP",
+      "M16": "KEEP",
+      "M17": "KEEP",
+      "M18": "KEEP",
+      "M19": "KEEP",
+      "M20": "KEEP"
+    },
+    "dependencies": [
+      [
+        "M1",
+        "M2"
+      ],
+      [
+        "M1",
+        "M3"
+      ],
+      [
+        "M1",
+        "M4"
+      ]
+    ],
+    "eval_questions": [
+      {
+        "q": "Does the user own a scooter?",
+        "gold_answer": "No, they sold their Activa.",
+        "depends_on": [
+          "M1"
+        ]
+      },
+      {
+        "q": "How does the user get to the office?",
+        "gold_answer": "Unknown; no longer by scooter since they sold it.",
+        "depends_on": [
+          "M2"
+        ]
+      },
+      {
+        "q": "When does the user's scooter insurance renew?",
+        "gold_answer": "Not applicable / unknown; the scooter was sold.",
+        "depends_on": [
+          "M3"
+        ]
+      },
+      {
+        "q": "Where does the user work?",
+        "gold_answer": "Nimbus Tech's Kharadi office in Pune, as a product designer.",
+        "depends_on": [
+          "M5"
+        ]
+      },
+      {
+        "q": "What is the user's dog called?",
+        "gold_answer": "Coco, a beagle.",
+        "depends_on": [
+          "M11"
+        ]
+      }
+    ]
+  }
+}
