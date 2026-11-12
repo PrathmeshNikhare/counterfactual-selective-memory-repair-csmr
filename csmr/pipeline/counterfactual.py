@@ -58,6 +58,11 @@ Decide in two steps.
      sourdough from a bakery in Lisbon", new fact "The user left Lisbon and lives in Oslo", answer "The user buys
      sourdough from a bakery." -> contradicts).
      This applies whatever determined_by_change is.
+     Nothing else is a contradiction. An answer that merely differs from the stored memory (other wording, more or
+     less detail, a different reading of it) is NOT "contradicts" when the new fact does not affect that memory: the
+     stored memory is not the reference answer. E.g. stored memory "The user's book club meets on the first Monday of
+     each month", new fact "The user switched to a new phone carrier", answer "The book club meets on Mondays, roughly
+     once a month." -> consistent (the new fact says nothing about the book club).
    - "consistent" (1.0): the answer is correct given the new fact. If determined_by_change is false, "unknown" or an
      uncertain answer is consistent.
    - "vague" (0.5): determined_by_change is true but the answer is "unknown" or vague.
@@ -94,31 +99,34 @@ def _norm(q: str) -> str:
 
 def _pick(qs: list[tuple[str, str | None]], cands: dict[str, CandidateInfo], store: MemoryStoreAdapter,
           n: int, cfg: dict) -> list[dict]:
-    """Slots fill in three tiers, each in probe order, output kept in probe order:
-    1. the first probe of every candidate proposed for a non-KEEP action (always kept, even beyond n);
-    2. the first probe of every other source memory, except KEEP-proposed candidates with P_dep < tau_d;
-    3. only if slots remain: further probes of an already-probed source (e.g. the root's own question next to the
-       change question) and probes of KEEP-proposed candidates with P_dep < tau_d."""
+    """At most n probes (a maximum, not a target), at most one per source memory, output in probe order.
+    Eligible: the first probe (the change probe; with templates, the fact memory's) and the first probe of every root
+    or candidate with P_dep >= tau_d. Priority when capped: the first probe, then non-KEEP-proposed sources, then the
+    rest, each in probe order."""
     first: dict[str | None, int] = {}
     for i, (_, m) in enumerate(qs):
         first.setdefault(m, i)
-    must = [i for m, i in first.items() if m and cands[m].proposed != Action.KEEP]
-    low = lambda m: m and cands[m].proposed == Action.KEEP and cands[m].p_dep < cfg["tau_d"]
-    second = [i for m, i in first.items() if i not in must and not low(m)]
-    third = [i for i in range(len(qs)) if i not in must and i not in second]
-    chosen = must + (second + third)[:max(n - len(must), 0)]
+    ok = [i for m, i in first.items() if i == 0 or (m and (cands[m].is_root or cands[m].p_dep >= cfg["tau_d"]))]
+    keep_src = lambda i: qs[i][1] is None or cands[qs[i][1]].proposed == Action.KEEP
+    chosen = sorted(sorted(ok, key=lambda i: (i != 0, keep_src(i), i))[:n])
     return [{"question": q, "source": m, "source_text": store.get(m).text if m else ""}
-            for q, m in (qs[i] for i in sorted(chosen))]
+            for q, m in (qs[i] for i in chosen)]
+
+
+def _gaps(probes: list[dict], order: list[str], cands: dict[str, CandidateInfo], lost: dict[str, str]) -> dict[str, str]:
+    """Non-KEEP-proposed candidates left without a probe; dropped by the n cap unless lost says why."""
+    covered = {p["source"] for p in probes}
+    return {m: lost.get(m, "capped") for m in order if cands[m].proposed != Action.KEEP and m not in covered}
 
 
 def generate_probes(delta: StateChange, obs: Observation, cands: dict[str, CandidateInfo],
                     store: MemoryStoreAdapter, n: int, cfg: dict | None = None) -> tuple[list[dict], dict[str, str]]:
     """One neutral probe about the root fact's current value (first candidate in order if there is no root), then
     one per candidate (roots/closest hops first, KEEP included); presupposing, yes/no, change-hinting and duplicate
-    probes dropped; every candidate proposed for a non-KEEP action keeps one probe, other slots fill in order up to n.
+    probes dropped; at most n kept, one per source memory, only for roots and candidates with P_dep >= tau_d (_pick).
     Returns (probes, gaps): probes are {"question", "source", "source_text"} (source = the memory the probe was written
     from; the change probe's is the root); gaps maps a non-KEEP-proposed candidate left without a probe to
-    "missing" | "filtered" | "duplicate".
+    "missing" | "filtered" | "duplicate" | "capped".
     The attribute key is never shown: probes name the subject as the memory text does."""
     cfg = cfg or load_config()
     mems = "\n".join(f"- {m}: {store.get(m).text}" for m in cands)
@@ -132,7 +140,8 @@ def generate_probes(delta: StateChange, obs: Observation, cands: dict[str, Candi
     if (out is None or not str(out.get("change_question") or "").strip()
             or not isinstance(out.get("memory_questions"), dict)):
         llm.fallback("probes", "malformed response; one template probe per candidate")
-        return _pick(templates, cands, store, n, cfg), {}
+        probes = _pick(templates, cands, store, n, cfg)
+        return probes, _gaps(probes, order, cands, {})
     per_mem = out["memory_questions"]
     lost = {m: "missing" for m in order if m not in per_mem}
     kept: list[tuple[str, str | None]] = []
@@ -149,11 +158,10 @@ def generate_probes(delta: StateChange, obs: Observation, cands: dict[str, Candi
             kept.append((q, m))
     if not kept:
         llm.fallback("probes", "every probe filtered out; one template probe per candidate")
-        return _pick(templates, cands, store, n, cfg), {}
+        probes = _pick(templates, cands, store, n, cfg)
+        return probes, _gaps(probes, order, cands, {})
     probes = _pick(kept, cands, store, n, cfg)
-    covered = {p["source"] for p in probes}
-    gaps = {m: lost[m] for m in order if cands[m].proposed != Action.KEEP and m not in covered}
-    return probes, gaps
+    return probes, _gaps(probes, order, cands, lost)
 
 
 def _unknown_like(ans: str, cfg: dict) -> bool:

@@ -173,14 +173,16 @@ def generate_probes(delta, obs, cands, store, n: int, cfg=None) -> tuple[list[di
 # Targeting: each memory question asks about the detail of that memory connected to the stored fact the change_question is about (same kind of detail: place, device, provider, person...), so its answer reveals whether the memory still holds; it never presupposes the memory's old value of that detail ("The user buys sailing supplies from a chandlery next to Harbor Point", fact "sailboat kept at the Harbor Point marina" -> "Where does the user buy sailing supplies?", not "What does the user buy?" nor "Which shop next to Harbor Point...?").
 # Over-generic LLM probes (only wh-words, auxiliaries, "the user" and generic verbs, cfg.probe_generic_words; e.g. "What does the user have?") are dropped like filtered probes.
 # Prompt examples use no wording from dev/showcase scenarios or their gold questions.
-# One "change_question" about the CURRENT value of the root fact (root memory text(s); the first candidate in order if there is no root), then one per candidate (KEEP-proposed included, so over-repair is detectable), roots first, then by P_dep descending, ties by numeric memory id (never string order: "M12" must not outrank "M2"); capped at n (config n_probes=6).
+# The LLM writes one "change_question" about the CURRENT value of the root fact (root memory text(s); the first candidate in order if there is no root), then one per candidate (KEEP-proposed included, so a dependent KEEP memory can still expose over-repair), roots first, then by P_dep descending, ties by numeric memory id (never string order: "M12" must not outrank "M2").
 # Coverage: duplicate questions (case/whitespace-insensitive; template fallback probes too) are dropped, first kept.
-# Probe cleanup (semantic dedupe by source memory, then low-dependency KEEP): slots fill in three tiers, each in the order above; the output keeps that order.
-#   1. the first probe of every candidate proposed for a non-KEEP action: always kept, even beyond n;
-#   2. the first probe of every other source memory, except candidates proposed KEEP with P_dep < tau_d;
-#   3. only if slots remain (up to n): further probes of an already-probed source (e.g. the root's own memory question,
-#      which asks the same thing as the change_question) and probes of KEEP-proposed candidates with P_dep < tau_d.
-# gaps (Trace.probe_gaps): every non-KEEP-proposed candidate left without a probe -> "missing" (LLM gave none) | "filtered" (presupposing / yes-no / change-hinting) | "duplicate".
+# Probe selection (strict; cfg.n_probes = 6 is a MAXIMUM, not a target; fewer probes is fine, slots are never filled with other probes):
+#   - at most ONE probe per source memory: the change_question is the root's probe, so the root's own memory question is dropped;
+#   - eligible: the change_question (always), and the probe of every root or candidate with P_dep >= tau_d; probes of
+#     candidates with P_dep < tau_d are never kept;
+#   - if more than n are eligible: the change_question first, then candidates proposed for a non-KEEP action, then the
+#     rest, each in the order above; the output keeps that order. (A non-KEEP candidate always has P_dep >= tau_d or is
+#     a root, §6, so it is always eligible; only the n cap can leave it unprobed.)
+# gaps (Trace.probe_gaps): every non-KEEP-proposed candidate left without a probe -> "missing" (LLM gave none) | "filtered" (presupposing / yes-no / change-hinting) | "duplicate" | "capped" (eligible, but over the n maximum).
 # Probes using a word only the observation introduces (e.g. "sold") are dropped.
 # Probes are open questions (what/which/where/how/who): LLM probes starting with a yes/no word (cfg.probe_yes_no_starts) or containing a change-hinting word (cfg.probe_banned_patterns: "still", "anymore", "no longer", ...) are dropped. If no LLM probe survives, the template fallback probes (below) are used and a "probes" fallback is recorded.
 def judge(answer: str, question: str, delta, obs, cfg, source_text: str = "") -> dict       # ONE call, two explicit steps:
@@ -190,6 +192,7 @@ def judge(answer: str, question: str, delta, obs, cfg, source_text: str = "") ->
 #   determined_by_change=true:  "unknown"/vague is vague (0.5)
 #   Only claims about the CURRENT state can contradict: mentioning an old value explicitly as past/previous ("used Alembic before; current method unknown") is NOT asserting it.
 #   An answer asserting something the change makes false OR likely outdated is "contradicts" (0.0) whatever determined_by_change is (e.g. "drives to work every day: Yes" after "sold their car"). determined_by_change only decides how unknown-like answers score.
+#   "contradicts" is allowed ONLY in those two cases: the answer conflicts with the change (Δ / observation), or it still asserts the part of the source memory that the change makes false or outdated. An answer that merely differs from an unaffected source memory (other wording, more or less detail, a different reading) is NOT a contradiction: the source memory is context, not the reference answer (prompt example: a book-club schedule after a phone-carrier change). Motivation: car_sale_distractors, "On which days does the user work?" (source "works from 10am to 6pm on weekdays") was judged "contradicts" after "I sold my car" in every repair set.
 # Unknown-like answers (empty, or matching cfg.unknown_patterns when <= cfg.unknown_max_words words, or when the answer starts with a pattern) get the verdict IN CODE: consistent (1.0) if determined_by_change is false, vague (0.5) if true.
 #   The LLM verdict field is used only for answers that make a claim.
 # Probes are always third person ("the user"), never "you".

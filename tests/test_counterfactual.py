@@ -204,26 +204,27 @@ def test_generate_probes_delta_plus_one_per_candidate_capped(monkeypatch):
     monkeypatch.setattr(llm, "call", lambda p, **k: {"change_question": "D?", "memory_questions":
                                                      {"M4": "q4", "M2": "q2", "M1": "q1", "M9": "junk"}})
     store = InMemoryAdapter(sc.memories)
-    assert _qs(cf.generate_probes(DELTA, sc.observation, cands, store, 6)) == ["D?", "q1", "q2", "q4"]
-    # q1 is M1's second probe and M4 is KEEP with P_dep 0.1 < tau_d: both wait for spare slots
-    assert _qs(cf.generate_probes(DELTA, sc.observation, cands, store, 2)) == ["D?", "q2"]
-    assert _qs(cf.generate_probes(DELTA, sc.observation, cands, store, 3)) == ["D?", "q1", "q2"]
+    # q1 is M1's second probe (the change probe already covers M1); M4 has P_dep 0.1 < tau_d: never probed
+    assert _qs(cf.generate_probes(DELTA, sc.observation, cands, store, 6)) == ["D?", "q2"]
+    assert _qs(cf.generate_probes(DELTA, sc.observation, cands, store, 1)) == ["D?"]
 
 
-def test_probe_tiers_one_per_source_then_low_dependency_keep(monkeypatch):
+def test_probes_strict_one_per_source_dependent_only_n_is_a_maximum(monkeypatch):
     sc = load_scenario("data/dev/car_sale.json")
-    cands = {"M1": _c("M1", 0, 1.0, .9, True), "M2": _c("M2", 1, .9, .9), "M3": _c("M3", 1, .3, .9),
-             "M4": _c("M4", 1, .6, .9)}
-    cands["M1"].proposed, cands["M2"].proposed = Action.REVOKE, Action.REVISE  # M3 (P .3), M4 (P .6) stay KEEP
+    cands = {"M1": _c("M1", 0, 1.0, .9, True), "M2": _c("M2", 1, .5, .9), "M3": _c("M3", 1, .49, .9),
+             "M4": _c("M4", 1, .9, .9), "M5": _c("M5", 2, .6, .9)}
+    cands["M1"].proposed, cands["M2"].proposed = Action.REVOKE, Action.REVISE  # M3, M4, M5 stay KEEP
     monkeypatch.setattr(llm, "call", lambda p, **k: {"change_question": "D?", "memory_questions":
-                                                     {"M1": "q1", "M2": "q2", "M3": "q3", "M4": "q4"}})
+                                                     {m: f"q{m[1]}" for m in cands}})
     store = InMemoryAdapter(sc.memories)
-    got = lambda n: _qs(cf.generate_probes(DELTA, sc.observation, cands, store, n))
-    # probe order: D?(M1) q1(M1) q2(M2) q4(M4) q3(M3). tier 1 = D?, q2 (non-KEEP); tier 2 = q4; tier 3 = q1, q3
-    assert got(1) == ["D?", "q2"]  # tier 1 is kept even beyond n
-    assert got(3) == ["D?", "q2", "q4"]
-    assert got(4) == ["D?", "q1", "q2", "q4"]
-    assert got(5) == ["D?", "q1", "q2", "q4", "q3"]
+    got = lambda n: cf.generate_probes(DELTA, sc.observation, cands, store, n)
+    # probe order D?(M1) q1(M1) q4(.9) q5(.6) q2(.5) q3(.49): q1 repeats M1, q3 is below tau_d -> never kept
+    assert _qs(got(9)) == ["D?", "q4", "q5", "q2"]  # 4 < n: no filling up to 9
+    # capped: change probe, then non-KEEP M2, then the rest in order; output stays in probe order
+    assert _qs(got(3)) == ["D?", "q4", "q2"] and got(3)[1] == {}
+    assert _qs(got(2)) == ["D?", "q2"]
+    probes, gaps = got(1)
+    assert _qs((probes, gaps)) == ["D?"] and gaps == {"M2": "capped"}  # n is a hard maximum
 
 
 def _seen_views(monkeypatch):
@@ -438,7 +439,8 @@ def test_probe_order_roots_then_p_dep_then_numeric_id(monkeypatch):
     qs = {m: f"q{m}" for m in cands}
     monkeypatch.setattr(llm, "call", lambda p, **k: {"change_question": "D?", "memory_questions": qs})
     out = _qs(cf.generate_probes(DELTA, sc.observation, cands, InMemoryAdapter(sc.memories), 9))
-    assert out == ["D?", "qM1", "qM2", "qM3", "qM12"]  # root first; higher p_dep next; ties by numeric id
+    # root first (its own qM1 repeats the change probe's source); higher p_dep next; ties by numeric id
+    assert out == ["D?", "qM2", "qM3", "qM12"]
 
 
 @pytest.mark.parametrize("ans", ["Yes, the user drives to work every day.", "Yes, the user spends money on fuel."])
@@ -539,7 +541,7 @@ def test_probe_coverage_dedup_guarantee_and_gaps(monkeypatch):
     sc = load_scenario("data/dev/car_sale_distractors.json")
     store = InMemoryAdapter(sc.memories)
     cands = {"M1": _c("M1", 0, 1.0, .9, True), "M12": _c("M12", 1, .95, .9), "M13": _c("M13", 1, .94, .9),
-             "M2": _c("M2", 1, .5, .9), "M3": _c("M3", 1, .4, .9), "M4": _c("M4", 1, .3, .9), "M6": _c("M6", 1, .2, .9)}
+             "M2": _c("M2", 1, .6, .9), "M3": _c("M3", 1, .55, .9), "M4": _c("M4", 1, .52, .9), "M6": _c("M6", 1, .51, .9)}
     for m in ("M1", "M2", "M3", "M4", "M6"):
         cands[m].proposed = Action.REVISE  # M12, M13 stay KEEP
     monkeypatch.setattr(llm, "call", lambda p, **k: {
@@ -557,6 +559,27 @@ def test_probe_coverage_dedup_guarantee_and_gaps(monkeypatch):
     assert gaps == {"M3": "filtered", "M6": "missing"}  # M1 is covered by the change probe, so not a gap
     probes, _ = cf.generate_probes(DELTA, sc.observation, cands, store, 5)  # spare slots fill in p_dep order
     assert [p["source"] for p in probes] == ["M1", "M12", "M13", "M2", "M4"]
+    probes, gaps = cf.generate_probes(DELTA, sc.observation, cands, store, 2)
+    assert [p["source"] for p in probes] == ["M1", "M2"] and gaps == {"M3": "filtered", "M4": "capped", "M6": "missing"}
+
+
+def _scope_aware_judge(p, **k):
+    """Stub judge following the prompt's scope rule: an answer that merely differs from an unaffected stored memory
+    is not a contradiction. Without the rule it reproduces the real-LLM M12 false positive."""
+    scope_rule = "merely differs from the stored memory" in p and "is NOT \"contradicts\" when the new fact does" in p
+    return {"determined_by_change": False, "verdict": "consistent" if scope_rule else "contradicts"}
+
+
+def test_judge_answer_differing_from_unaffected_memory_is_not_a_contradiction(monkeypatch):
+    # real run on car_sale_distractors, every repair set: M12 work-days probe judged "contradicts" after "I sold my car"
+    sc = load_scenario("data/dev/car_sale_distractors.json")
+    m12 = InMemoryAdapter(sc.memories).get("M12").text  # "The user works from 10am to 6pm on weekdays."
+    ans = "The user works Monday through Thursday, and most Fridays, taking one Friday off each month."
+    seen = []
+    monkeypatch.setattr(llm, "call", lambda p, **k: seen.append(p) or _scope_aware_judge(p))
+    out = cf.judge(ans, "On which days does the user work?", DELTA, sc.observation, CFG, m12)
+    assert out == {"determined_by_change": False, "verdict": "consistent", "score": 1.0}
+    assert "Nothing else is a contradiction." in seen[0] and "book club" in seen[0]  # example unrelated to scenarios
 
 
 def test_probe_duplicate_of_other_memory_is_a_gap(monkeypatch):
