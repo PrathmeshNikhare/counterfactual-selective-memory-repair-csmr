@@ -76,6 +76,7 @@ temporary_patterns: ["this week", "for now", "temporarily", "\\buntil\\b", "for 
 
 # Phase D objective (paper Section V)
 n_probes: 6
+probe_exclude_observation: true   # Benefit answers probes over M ⊕ R WITHOUT the new observation memory (Spec 10)
 lambda_c: 0.5       # collateral
 lambda_e: 0.1       # evidence cost
 lambda_s: 0.05      # repair size

@@ -58,5 +58,5 @@ def run_pipeline(obs: Observation, store: MemoryStoreAdapter, cfg: dict | None =
     # E
     trace.transitions = commit(store, best, revised, conditions, new_mem)
     if use_cf:
-        trace.validation = validate(store, trace.probes, delta, obs, best.score["benefit"], cfg)
+        trace.validation = validate(store, trace.probes, delta, obs, best.score["benefit"], cfg, new_mem.id)
     return finish()

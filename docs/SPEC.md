@@ -153,7 +153,7 @@ def is_feasible(rs: RepairSet, cands, cfg) -> bool
 def view(store, rs: RepairSet, revised: dict[str,str], conditions: dict[str,str], new_mem: Memory | None = None) -> list[Memory]
 def observation_memory(delta, obs, store) -> Memory
 ```
-The new observation is itself a memory (`observation_memory`: text = delta.statement, entity/attribute from Δ, source/time from the observation, id `OBS<n>`) and is appended to EVERY view, R0 included. Repair actions apply only to existing memories.
+The new observation is itself a memory (`observation_memory`: text = delta.statement, entity/attribute from Δ, source/time from the observation, id `OBS<n>`) and is appended to EVERY view, R0 included. Repair actions apply only to existing memories. Exception: the counterfactual Benefit (§10) and commit validation (§11) remove it from the view again when `cfg.probe_exclude_observation` is true; it is still committed (§11) and still visible to the agent at evaluation time (§13, §14).
 Per memory: REVOKE → excluded; REVISE → text replaced; VERIFY → text prefixed "[unverified] "; CONDITIONAL → "{text} (only valid if: {condition})"; else unchanged. Never mutates the store.
 REVISE and CONDITIONAL (`REDATED_ACTIONS`) also set the memory's `time` to the observation's time (`new_mem.time`), exactly as the commit does (§11), so the agent sees the same dates during selection and after the commit. VERIFY and KEEP keep their original date.
 
@@ -174,7 +174,12 @@ def generate_probes(delta, obs, cands, store, n: int, cfg=None) -> tuple[list[di
 # Over-generic LLM probes (only wh-words, auxiliaries, "the user" and generic verbs, cfg.probe_generic_words; e.g. "What does the user have?") are dropped like filtered probes.
 # Prompt examples use no wording from dev/showcase scenarios or their gold questions.
 # One "change_question" about the CURRENT value of the root fact (root memory text(s); the first candidate in order if there is no root), then one per candidate (KEEP-proposed included, so over-repair is detectable), roots first, then by P_dep descending, ties by numeric memory id (never string order: "M12" must not outrank "M2"); capped at n (config n_probes=6).
-# Coverage: duplicate questions (case/whitespace-insensitive; template fallback probes too) are dropped, first kept. The first probe of every candidate proposed for a non-KEEP action is always kept (even beyond n); remaining slots fill in the order above up to n.
+# Coverage: duplicate questions (case/whitespace-insensitive; template fallback probes too) are dropped, first kept.
+# Probe cleanup (semantic dedupe by source memory, then low-dependency KEEP): slots fill in three tiers, each in the order above; the output keeps that order.
+#   1. the first probe of every candidate proposed for a non-KEEP action: always kept, even beyond n;
+#   2. the first probe of every other source memory, except candidates proposed KEEP with P_dep < tau_d;
+#   3. only if slots remain (up to n): further probes of an already-probed source (e.g. the root's own memory question,
+#      which asks the same thing as the change_question) and probes of KEEP-proposed candidates with P_dep < tau_d.
 # gaps (Trace.probe_gaps): every non-KEEP-proposed candidate left without a probe -> "missing" (LLM gave none) | "filtered" (presupposing / yes-no / change-hinting) | "duplicate".
 # Probes using a word only the observation introduces (e.g. "sold") are dropped.
 # Probes are open questions (what/which/where/how/who): LLM probes starting with a yes/no word (cfg.probe_yes_no_starts) or containing a change-hinting word (cfg.probe_banned_patterns: "still", "anymore", "no longer", ...) are dropped. If no LLM probe survives, the template fallback probes (below) are used and a "probes" fallback is recorded.
@@ -196,14 +201,17 @@ def select(repair_sets, ...) -> tuple[RepairSet, list[dict]]
 Objective (paper Section V):
 ```
 total = Benefit − λc·Collateral − λe·EvidenceCost − λs·|R|
-Benefit       = mean judge score over probes under view(store, rs, ..., new_mem)  (observation memory included in every view)
+Benefit       = mean judge score over probes, answered by the agent over view(store, rs, ..., new_mem) minus the
+                observation memory itself when cfg.probe_exclude_observation (default true), i.e. over M ⊕ R alone;
+                new_mem still supplies the date given to REVISE / CONDITIONAL memories (§8)
 Collateral    = Σ_{m changed (REVISE/REVOKE)} (1 − P_dep(m))          # runtime proxy
 EvidenceCost  = (#VERIFY actions in rs) * cfg.verify_cost + llm_calls_for_rs * cfg.call_cost
 |R|           = number of non-KEEP actions
 ```
+- **Benefit excludes the new observation memory** (`probe_exclude_observation: true`, design decision taken before the freeze). Rationale: Benefit should measure whether the *repaired store itself* answers correctly. In later turns the observation is one memory among many and is not reliably retrieved (the agent sees only the top `agent_top_k`), so a stale memory that the observation happens to outvote today will mislead the agent later. With the observation in every view, R0 can score as well as a real repair because the date-aware agent (§9) resolves the conflict in favour of the observation, and the objective then prefers no repair. The judge still receives Δ and the observation (it needs them to grade). The observation memory is still committed (§11) and is part of the store that baselines and evaluation answer from (§13, §14); only CSMR's internal Benefit (and the matching commit validation) leave it out. `false` restores the previous behaviour (observation in every view).
 - argmax over feasible sets; ties → smaller |R|.
 - Cache answers by (question, source_text, hash of view) — identical views reuse results. The view hash covers each memory's id, date and text (everything the agent sees).
-- Commit validation re-judges each probe with the same pre-commit source_text.
+- Commit validation re-judges each probe with the same pre-commit source_text, and under the same `probe_exclude_observation` setting (it is given the committed observation memory's id and leaves it out of the view), so selection and validation see the same memories.
 - Malformed LLM JSON never crashes a run; each fallback is counted in `Trace.llm_stats["fallbacks"]` (`llm.fallback(kind)`): extract (missing/invalid keys) → no state change; probes (missing/invalid) → one template probe per candidate, "What is the current state of this: <memory text>?" (built from memory text only, so never filtered); judge → retried once with a changed prompt, then verdict "vague" (0.5), `determined_by_change` null.; causal cue (dependency) → retried once, then "no"; REVISE text → retried once, then template "Previously: <text>. Possibly outdated after: <statement>"; CONDITIONAL condition → retried once, then "it is not affected by: <statement>" (kinds `causal_cue`, `revise_text`, `condition_text`).
 - Ties: totals within `cfg.tie_eps` are tied → smaller |R|. Token budgets: `cfg.probe_max_tokens`, `cfg.judge_max_tokens`.
 - Ablation `use_counterfactual=false`: select R3 (apply all proposed actions) without probes.
@@ -213,7 +221,7 @@ EvidenceCost  = (#VERIFY actions in rs) * cfg.verify_cost + llm_calls_for_rs * c
 
 ```python
 def commit(store, rs, revised, conditions, new_mem) -> list[dict]   # version transitions; new_mem = observation_memory(...)
-def validate(store, probes, delta, obs, expected_benefit) -> dict
+def validate(store, probes, delta, obs, expected_benefit, cfg=None, obs_mem_id=None) -> dict   # obs_mem_id: see §10
 ```
 - The observation memory (`observation_memory`) is added to the store in the same commit (version 1, status active).
 - `commit` raises ValueError if `rs.feasible` is False.

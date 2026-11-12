@@ -93,15 +93,22 @@ def _norm(q: str) -> str:
 
 
 def _pick(qs: list[tuple[str, str | None]], cands: dict[str, CandidateInfo], store: MemoryStoreAdapter,
-          n: int) -> list[dict]:
-    """First probe of every candidate proposed for a non-KEEP action (even beyond n), then the rest in order up to n."""
-    must: dict[str, int] = {}
+          n: int, cfg: dict) -> list[dict]:
+    """Slots fill in three tiers, each in probe order, output kept in probe order:
+    1. the first probe of every candidate proposed for a non-KEEP action (always kept, even beyond n);
+    2. the first probe of every other source memory, except KEEP-proposed candidates with P_dep < tau_d;
+    3. only if slots remain: further probes of an already-probed source (e.g. the root's own question next to the
+       change question) and probes of KEEP-proposed candidates with P_dep < tau_d."""
+    first: dict[str | None, int] = {}
     for i, (_, m) in enumerate(qs):
-        if m and cands[m].proposed != Action.KEEP:
-            must.setdefault(m, i)
-    rest = [i for i in range(len(qs)) if i not in must.values()][:max(n - len(must), 0)]
+        first.setdefault(m, i)
+    must = [i for m, i in first.items() if m and cands[m].proposed != Action.KEEP]
+    low = lambda m: m and cands[m].proposed == Action.KEEP and cands[m].p_dep < cfg["tau_d"]
+    second = [i for m, i in first.items() if i not in must and not low(m)]
+    third = [i for i in range(len(qs)) if i not in must and i not in second]
+    chosen = must + (second + third)[:max(n - len(must), 0)]
     return [{"question": q, "source": m, "source_text": store.get(m).text if m else ""}
-            for q, m in (qs[i] for i in sorted([*must.values(), *rest]))]
+            for q, m in (qs[i] for i in sorted(chosen))]
 
 
 def generate_probes(delta: StateChange, obs: Observation, cands: dict[str, CandidateInfo],
@@ -125,7 +132,7 @@ def generate_probes(delta: StateChange, obs: Observation, cands: dict[str, Candi
     if (out is None or not str(out.get("change_question") or "").strip()
             or not isinstance(out.get("memory_questions"), dict)):
         llm.fallback("probes", "malformed response; one template probe per candidate")
-        return _pick(templates, cands, store, n), {}
+        return _pick(templates, cands, store, n, cfg), {}
     per_mem = out["memory_questions"]
     lost = {m: "missing" for m in order if m not in per_mem}
     kept: list[tuple[str, str | None]] = []
@@ -142,8 +149,8 @@ def generate_probes(delta: StateChange, obs: Observation, cands: dict[str, Candi
             kept.append((q, m))
     if not kept:
         llm.fallback("probes", "every probe filtered out; one template probe per candidate")
-        return _pick(templates, cands, store, n), {}
-    probes = _pick(kept, cands, store, n)
+        return _pick(templates, cands, store, n, cfg), {}
+    probes = _pick(kept, cands, store, n, cfg)
     covered = {p["source"] for p in probes}
     gaps = {m: lost[m] for m in order if cands[m].proposed != Action.KEEP and m not in covered}
     return probes, gaps
@@ -200,7 +207,9 @@ def prepare_texts(repair_sets: list[RepairSet], store: MemoryStoreAdapter, delta
 def _evaluate(rs: RepairSet, probes: list[dict], store: MemoryStoreAdapter, revised: dict[str, str],
               conditions: dict[str, str], cands: dict[str, CandidateInfo], delta: StateChange, obs: Observation,
               cfg: dict, cache: dict, new_mem: Memory | None) -> tuple[dict[str, float], list[dict]]:
-    mems = view(store, rs, revised, conditions, new_mem)
+    mems = view(store, rs, revised, conditions, new_mem)  # new_mem still dates REVISE / CONDITIONAL
+    if new_mem and cfg["probe_exclude_observation"]:  # Benefit = what the repaired store alone answers (Spec 10)
+        mems = [m for m in mems if m.id != new_mem.id]
     vhash = hashlib.sha256(json.dumps([(m.id, m.time, m.text) for m in mems]).encode()).hexdigest()  # what the agent sees
     details = []
     for p in probes:  # identical views reuse answers/judgements

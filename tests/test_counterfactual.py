@@ -205,7 +205,58 @@ def test_generate_probes_delta_plus_one_per_candidate_capped(monkeypatch):
                                                      {"M4": "q4", "M2": "q2", "M1": "q1", "M9": "junk"}})
     store = InMemoryAdapter(sc.memories)
     assert _qs(cf.generate_probes(DELTA, sc.observation, cands, store, 6)) == ["D?", "q1", "q2", "q4"]
-    assert _qs(cf.generate_probes(DELTA, sc.observation, cands, store, 2)) == ["D?", "q1"]
+    # q1 is M1's second probe and M4 is KEEP with P_dep 0.1 < tau_d: both wait for spare slots
+    assert _qs(cf.generate_probes(DELTA, sc.observation, cands, store, 2)) == ["D?", "q2"]
+    assert _qs(cf.generate_probes(DELTA, sc.observation, cands, store, 3)) == ["D?", "q1", "q2"]
+
+
+def test_probe_tiers_one_per_source_then_low_dependency_keep(monkeypatch):
+    sc = load_scenario("data/dev/car_sale.json")
+    cands = {"M1": _c("M1", 0, 1.0, .9, True), "M2": _c("M2", 1, .9, .9), "M3": _c("M3", 1, .3, .9),
+             "M4": _c("M4", 1, .6, .9)}
+    cands["M1"].proposed, cands["M2"].proposed = Action.REVOKE, Action.REVISE  # M3 (P .3), M4 (P .6) stay KEEP
+    monkeypatch.setattr(llm, "call", lambda p, **k: {"change_question": "D?", "memory_questions":
+                                                     {"M1": "q1", "M2": "q2", "M3": "q3", "M4": "q4"}})
+    store = InMemoryAdapter(sc.memories)
+    got = lambda n: _qs(cf.generate_probes(DELTA, sc.observation, cands, store, n))
+    # probe order: D?(M1) q1(M1) q2(M2) q4(M4) q3(M3). tier 1 = D?, q2 (non-KEEP); tier 2 = q4; tier 3 = q1, q3
+    assert got(1) == ["D?", "q2"]  # tier 1 is kept even beyond n
+    assert got(3) == ["D?", "q2", "q4"]
+    assert got(4) == ["D?", "q1", "q2", "q4"]
+    assert got(5) == ["D?", "q1", "q2", "q4", "q3"]
+
+
+def _seen_views(monkeypatch):
+    """Stub agent recording the memories it is shown; stub judge always consistent."""
+    seen = []
+    monkeypatch.setattr(cf, "answer", lambda q, mems, **k: seen.append(mems) or "x")
+    monkeypatch.setattr(cf, "judge", lambda *a, **k: {"determined_by_change": False, "verdict": "consistent",
+                                                       "score": 1.0})
+    return seen
+
+
+@pytest.mark.parametrize("exclude", [True, False])
+def test_benefit_probes_exclude_observation_memory_behind_flag(monkeypatch, exclude):
+    store, cands, sets, revised, probes, obs = _setup(monkeypatch)
+    seen = _seen_views(monkeypatch)
+    nm = observation_memory(DELTA, obs, store)
+    cf.select(sets, probes, store, revised, {}, cands, DELTA, obs, {**CFG, "probe_exclude_observation": exclude}, nm)
+    assert seen and all((nm.id in {m.id for m in v}) is not exclude for v in seen)
+    r2_view = next(v for v in seen if any(m.text == revised["M2"] for m in v))
+    assert next(m for m in r2_view if m.id == "M2").time == obs.time  # REVISE still re-dated without the obs memory
+
+
+@pytest.mark.parametrize("exclude,obs_id,shown", [(True, "OBS6", False), (False, "OBS6", True), (True, None, True)])
+def test_validate_uses_the_same_exclusion(monkeypatch, exclude, obs_id, shown):
+    from csmr.pipeline import commit as C
+    store, cands, sets, revised, probes, obs = _setup(monkeypatch)
+    nm = observation_memory(DELTA, obs, store)
+    C.commit(store, next(r for r in sets if r.name == "R1"), revised, {}, nm)
+    seen = []
+    monkeypatch.setattr(C, "answer", lambda q, mems, **k: seen.append(mems) or "x")
+    monkeypatch.setattr(C, "judge", lambda *a, **k: {"score": 1.0})
+    C.validate(store, probes, DELTA, obs, 1.0, {**CFG, "probe_exclude_observation": exclude}, obs_id)
+    assert nm.id == "OBS6" and all(("OBS6" in {m.id for m in v}) is shown for v in seen)
 
 
 def test_observation_memory_in_every_view(monkeypatch):

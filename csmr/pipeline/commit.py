@@ -40,11 +40,14 @@ def commit(store: MemoryStoreAdapter, rs, revised: dict[str, str], conditions: d
 
 
 def validate(store: MemoryStoreAdapter, probes: list[dict], delta: StateChange, obs: Observation,
-             expected_benefit: float, cfg: dict | None = None) -> dict:
+             expected_benefit: float, cfg: dict | None = None, obs_mem_id: str | None = None) -> dict:
     """Re-run the probes on the committed store; warn if benefit differs from the selection-time estimate.
-    The judge gets each probe's pre-commit source_text, as during selection."""
+    The judge gets each probe's pre-commit source_text, as during selection.
+    obs_mem_id: the committed observation memory; left out of the agent's view under probe_exclude_observation,
+    exactly as during selection (Spec 10)."""
     cfg = cfg or load_config()
-    mems = [r for m in store.all() if (r := render(m))]  # same rendering as overlay.view()
+    skip = obs_mem_id if obs_mem_id and cfg["probe_exclude_observation"] else None
+    mems = [r for m in store.all() if m.id != skip and (r := render(m))]  # same rendering as overlay.view()
     scores = [judge(answer(p["question"], mems, cfg=cfg), p["question"], delta, obs, cfg, p["source_text"])["score"]
               for p in probes]
     benefit = sum(scores) / len(scores) if scores else 0.0
