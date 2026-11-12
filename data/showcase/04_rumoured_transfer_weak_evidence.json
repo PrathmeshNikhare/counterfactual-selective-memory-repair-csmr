@@ -29,9 +29,9 @@
     },
     "dependencies": [["M1", "M2"], ["M1", "M3"], ["M1", "M4"]],
     "eval_questions": [
-      {"q": "Which office does the user work at?", "gold_answer": "Thoughtline's Bengaluru office (a possible move to Hyderabad is unconfirmed).", "depends_on": ["M1"]},
-      {"q": "How does the user commute to work?", "gold_answer": "By the company shuttle from HSR Layout.", "depends_on": ["M2"]},
-      {"q": "Where does the user live?", "gold_answer": "In a leased flat in HSR Layout, Bengaluru.", "depends_on": ["M3"]},
+      {"q": "Which office does the user work at?", "gold_answer": "Thoughtline's Bengaluru office.", "depends_on": ["M1"], "pending": true},
+      {"q": "How does the user commute to work?", "gold_answer": "By the company shuttle from HSR Layout.", "depends_on": ["M2"], "pending": true},
+      {"q": "Where does the user live?", "gold_answer": "In a leased flat in HSR Layout, Bengaluru.", "depends_on": ["M3"], "pending": true},
       {"q": "Who is the user's manager?", "gold_answer": "Kavya Nair.", "depends_on": ["M5"]}
     ]
   }

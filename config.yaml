@@ -139,3 +139,4 @@ dataset:
   persistence_min: 3
   persistence_max: 5
   near_dup_cosine: 0.92   # MiniLM cosine above this = near-duplicate text
+  scenarios_per_family: {test: 17, val: 13, train: 18}   # x 18 / 8 / 34 families = 306 / 104 / 612

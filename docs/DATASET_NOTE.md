@@ -1,7 +1,8 @@
 # Dataset (Phase 2 — placeholder)
 
-The full benchmark (~600 scenarios: 400 train / 80 val / 120 human-verified test, 8 categories × 10 domains)
-will be generated later and placed in `data/generated/{train,val,test}/*.json`.
+The full benchmark (1,022 scenarios: 612 train / 104 val / 306 human-verified test, 8 categories × 10 domains)
+will be generated later and placed in `data/generated/{train,val,test}/*.json`. Per seed family: 18 train / 13 val /
+17 test scenarios over 34 / 8 / 18 families (`config.yaml` → `dataset.scenarios_per_family`).
 
 It uses **exactly the same schema as `data/dev/*.json`**, so nothing in the pipeline changes when it arrives.
 
@@ -22,7 +23,8 @@ Schema rules:
 - `gold`: (NEVER read by csmr/pipeline)
   - `actions`: {memory_id: KEEP|VERIFY|CONDITIONAL|REVISE|REVOKE} for every memory
   - `dependencies`: [[root_id, dependent_id], …]
-  - `eval_questions`: [{q, gold_answer, depends_on: [ids]}]
+  - `eval_questions`: [{q, gold_answer, depends_on: [ids], pending?}]; `pending: true` iff the question depends on a
+    VERIFY memory (the QA judge is then told a hedge about the unconfirmed change is fine, SPEC §14)
   - `persistence_memories`: 3–5 later-turn memories written by the generator, same fields as `memories[]`
     (ids `P1`, `P2`, …). Used only by the persistence metric (SPEC §14): they are appended to the agent's view
     before the eval questions are re-asked. Rules:
@@ -52,9 +54,9 @@ Conventions the seeds fix:
   removes the dependent's reason (a fuel budget, a parking pass), it is VERIFY.
 
 Gold answers:
-- **VERIFY memories** (weak evidence, and "reason removed" dependents): the current, old value. A hedge naming the
-  pending change is fine ("Two cats, Kesar and Elaichi (they might rehome one)"); asserting the change happened is
-  wrong.
+- **VERIFY memories** (weak evidence, and "reason removed" dependents): the plain current, old value, no hedge
+  ("Two cats, Kesar and Elaichi."), and the question gets `"pending": true`. The QA judge then accepts an answer
+  that hedges about the unconfirmed change and rejects one that asserts the change happened.
 - **Changed memories whose new value is not stated**: say the old value no longer holds and the new one is not
   stated, e.g. "Not stated; they no longer use Samsung Wallet since switching to a Pixel."
 - **CONDITIONAL memories**: the normal value plus the temporary exception and its end.
@@ -66,7 +68,8 @@ gives the generator a change `pattern`, an example `observation`, `core_memories
 source, `role` ∈ root | dependent | hard_negative, `gold_action`), `dependencies` (chains are written hop by hop:
 `[[M1, M2], [M2, M3]]`), `hard_negative_guidance` + `hard_negative_examples`, `forbidden` (content the generator
 must not add as a hard negative or filler because the change would actually affect it), `persistence_guidance` +
-`persistence_examples`, and `eval_questions`. `docs/seed_review.md` lists the test families for human review. A generated scenario keeps the core memories (paraphrase allowed,
+`persistence_examples`, and `eval_questions`. `docs/seed_review.md` lists the test families for human review; regenerate it with
+`python eval/render_seed_review.py` after editing the seeds (the validator fails while it is stale). A generated scenario keeps the core memories (paraphrase allowed,
 labels unchanged), pads to 30–40 memories with ~10 hard negatives plus background, adds times, and records its seed
 in a top-level `"family"` field (`load_scenario` ignores it).
 

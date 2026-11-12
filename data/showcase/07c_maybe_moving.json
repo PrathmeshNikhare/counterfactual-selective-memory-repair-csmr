@@ -206,10 +206,11 @@
     "eval_questions": [
       {
         "q": "Where does the user live?",
-        "gold_answer": "Viman Nagar, Pune (a possible move to Baner is undecided).",
+        "gold_answer": "Viman Nagar, Pune.",
         "depends_on": [
           "M8"
-        ]
+        ],
+        "pending": true
       },
       {
         "q": "When does the user's lease end?",

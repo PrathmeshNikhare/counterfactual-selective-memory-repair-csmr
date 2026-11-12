@@ -4099,17 +4099,19 @@
       "eval_questions": [
         {
           "q": "Which company employs the user, and in what role?",
-          "gold_answer": "Finverse in Gurugram as a backend developer (they are thinking of leaving, not decided).",
+          "gold_answer": "Finverse in Gurugram, as a backend developer.",
           "depends_on": [
             "M1"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "Which transport does the user take to the Finverse office?",
           "gold_answer": "The Rapid Metro.",
           "depends_on": [
             "M2"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "What does the user bake on weekends?",
@@ -4202,17 +4204,19 @@
       "eval_questions": [
         {
           "q": "Which neighbourhood is the user's rented home in?",
-          "gold_answer": "Alkapuri, Vadodara: a rented 2BHK (they may move to Gotri next year; not decided).",
+          "gold_answer": "Alkapuri, Vadodara (a rented 2BHK).",
           "depends_on": [
             "M1"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "How much does the user pay each month for their flat?",
           "gold_answer": "Rs 18,000 in rent.",
           "depends_on": [
             "M3"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "Who lives in Gotri?",
@@ -4305,17 +4309,19 @@
       "eval_questions": [
         {
           "q": "What does the user do every morning before work?",
-          "gold_answer": "Runs 5 km (it may stop if the physio advises; not decided yet).",
+          "gold_answer": "Runs 5 km.",
           "depends_on": [
             "M1"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "Which race is the user training for?",
           "gold_answer": "The Hyderabad half marathon in January.",
           "depends_on": [
             "M2"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "Who had knee replacement surgery?",
@@ -4408,17 +4414,19 @@
       "eval_questions": [
         {
           "q": "Does the user eat chicken?",
-          "gold_answer": "Yes (they are considering going vegetarian but are not sure).",
+          "gold_answer": "Yes.",
           "depends_on": [
             "M1"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "What does the user order every Friday?",
           "gold_answer": "Butter chicken from Punjab Grill.",
           "depends_on": [
             "M2"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "What diet does the user's spouse follow?",
@@ -4515,14 +4523,16 @@
           "gold_answer": "Two cats, Kesar and Elaichi.",
           "depends_on": [
             "M1"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "How much cat litter does the user buy each month?",
           "gold_answer": "Two bags.",
           "depends_on": [
             "M3"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "What is the user's mother allergic to?",
@@ -4615,17 +4625,19 @@
       "eval_questions": [
         {
           "q": "Who is the user in a relationship with?",
-          "gold_answer": "Kavin, who lives in Madurai (they are going through a rough patch and might take a break; nothing decided).",
+          "gold_answer": "Kavin, who lives in Madurai.",
           "depends_on": [
             "M1"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "Where are the user and Kavin planning to go in December?",
           "gold_answer": "Munnar.",
           "depends_on": [
             "M3"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "What does Kavin's sister do?",
@@ -4718,17 +4730,19 @@
       "eval_questions": [
         {
           "q": "What is the user studying?",
-          "gold_answer": "A BSc in physics at St. Xavier's College, Ranchi (they are considering switching to computer science; not decided).",
+          "gold_answer": "A BSc in physics at St. Xavier's College, Ranchi.",
           "depends_on": [
             "M1"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "What does the user do on Monday afternoons?",
           "gold_answer": "Physics lab sessions.",
           "depends_on": [
             "M2"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "What does the user's elder brother do?",
@@ -4821,17 +4835,19 @@
       "eval_questions": [
         {
           "q": "Which laptop does the user use?",
-          "gold_answer": "A Lenovo ThinkPad T480 (they'll probably replace it after Diwali; not certain).",
+          "gold_answer": "A Lenovo ThinkPad T480.",
           "depends_on": [
             "M1"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "What does the user edit on their laptop?",
           "gold_answer": "Videos for their YouTube channel.",
           "depends_on": [
             "M2"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "What appliance is the user waiting for the Diwali sales to buy?",
@@ -4924,17 +4940,19 @@
       "eval_questions": [
         {
           "q": "What car does the user drive?",
-          "gold_answer": "A Tata Nexon EV (a neighbour reports it was sold; not confirmed by the user).",
+          "gold_answer": "A Tata Nexon EV.",
           "depends_on": [
             "M1"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "How do the user's kids get to school?",
           "gold_answer": "The user drives them in the Nexon.",
           "depends_on": [
             "M3"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "Which car did the user sell in 2022?",
@@ -5131,17 +5149,19 @@
       "eval_questions": [
         {
           "q": "Does the user drink alcohol?",
-          "gold_answer": "According to the user, no (a friend's party photos suggest otherwise; unconfirmed).",
+          "gold_answer": "No.",
           "depends_on": [
             "M1"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "Who usually drives back from parties?",
           "gold_answer": "The user, as the designated driver.",
           "depends_on": [
             "M2"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "What does the user's brother run?",
@@ -5333,10 +5353,11 @@
       "eval_questions": [
         {
           "q": "Is the user in a relationship?",
-          "gold_answer": "The user says they are single (an aunt claims they are engaged to Priyanka; unconfirmed).",
+          "gold_answer": "No; the user is single.",
           "depends_on": [
             "M1"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "What does Priyanka do?",
@@ -5436,17 +5457,19 @@
       "eval_questions": [
         {
           "q": "Which programme has the user been admitted to?",
-          "gold_answer": "MSc Economics at the Delhi School of Economics, according to the user (a classmate reports the list was revised without their name; unconfirmed).",
+          "gold_answer": "MSc Economics at the Delhi School of Economics.",
           "depends_on": [
             "M1"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "Where has the user booked accommodation for August?",
           "gold_answer": "A PG room near North Campus.",
           "depends_on": [
             "M2"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "Where did the user's elder sister study?",
@@ -5539,17 +5562,19 @@
       "eval_questions": [
         {
           "q": "When does the user pay the LIC premium?",
-          "gold_answer": "Every January, Rs 24,000 (a caller claims the policy lapsed; unconfirmed).",
+          "gold_answer": "Every January (Rs 24,000).",
           "depends_on": [
             "M1"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "How much cover does the user's LIC policy give?",
           "gold_answer": "Rs 25 lakh.",
           "depends_on": [
             "M2"
-          ]
+          ],
+          "pending": true
         },
         {
           "q": "Which company is the user's health insurance with?",

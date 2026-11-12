@@ -2,13 +2,15 @@
 
   python eval/validate_dataset.py [--seeds data/seeds] [--root data/generated]
 
-Seeds: schema (incl. a non-empty `forbidden` list), exactly one valid gold action per core memory, the labeling conventions, dependency / depends_on ids,
-balance over categories and domains (overall and per split), every category in every split, splits.json partitions the families.
+Seeds: schema (incl. a non-empty `forbidden` list), exactly one valid gold action per core memory, the labeling
+conventions, dependency / depends_on ids, balance over categories and domains (overall and per split), every category
+in every split, splits.json partitions the families, docs/seed_review.md matches eval/render_seed_review.py.
 Scenarios (<root>/<split>/*.json): the same gold checks, plus the real loader accepts the file, 30-40 memories dated
-no later than the observation, 3-5 persistence memories dated after it, and the scenario's `family` sits in that
-split in splits.json. Near-duplicates (MiniLM cosine > dataset.near_dup_cosine): texts within one family/scenario,
-observations across splits (leakage), and every text against data/dev + data/showcase. Prints count tables per
-split x category / domain / action; exits 1 on any error."""
+no later than the observation, 3-5 persistence memories dated after it, the scenario's `family` sits in that split in
+splits.json, and each family of a split with scenarios has dataset.scenarios_per_family[split] of them.
+Both: an eval question has `pending: true` iff it depends on a VERIFY memory. Near-duplicates (MiniLM cosine >
+dataset.near_dup_cosine): texts within one family/scenario, observations across splits (leakage), and every text
+against data/dev + data/showcase. Prints count tables per split x category / domain / action; exits 1 on any error."""
 from __future__ import annotations
 
 import argparse
@@ -27,6 +29,7 @@ from csmr.config import ROOT, load_config
 from csmr.models import embed
 from csmr.scenario import load_scenario
 from csmr.types import Action
+from eval.render_seed_review import REVIEW, render
 
 CATEGORIES = ("direct_contradiction", "one_hop", "two_hop", "three_hop", "false_similarity", "weak_evidence",
               "conflicting_source", "temporary_change")
@@ -62,6 +65,8 @@ def check_gold(where: str, cat: str, dom: str, mem_ids: list[str], actions: dict
             e.append(f"{where}: eval question without q or gold_answer: {q}")
         if not q.get("depends_on") or not set(q["depends_on"]) <= ids:
             e.append(f"{where}: depends_on {q.get('depends_on')} of {q.get('q')!r} is missing or names unknown ids")
+        elif bool(q.get("pending")) != any(actions.get(i) == "VERIFY" for i in q["depends_on"]):
+            e.append(f"{where}: {q['q']!r} must have pending: true iff it depends on a VERIFY memory")
     used = set(actions.values())
     if cat == "weak_evidence" and used & {"REVISE", "REVOKE"}:
         e.append(f"{where}: weak_evidence must not REVISE/REVOKE")
@@ -82,8 +87,8 @@ def _balanced(where: str, counts: Counter, keys) -> list[str]:
     return [f"{where} unbalanced: {dict(counts)}"] * (max(n) - min(n) > 1)
 
 
-def check_seeds(seed_dir: Path) -> tuple[list[str], list[dict], dict[str, str]]:
-    """Errors, one item per family (for near-dups and stats), family -> split."""
+def check_seeds(seed_dir: Path, review: Path = REVIEW) -> tuple[list[str], list[dict], dict[str, str]]:
+    """Errors, one item per family (for near-dups and stats), family -> split. Also: the review file is current."""
     fams = json.loads((seed_dir / "seeds.json").read_text(encoding="utf-8"))["families"]
     splits = json.loads((seed_dir / "splits.json").read_text(encoding="utf-8"))
     split_of = {f: s for s, fs in splits.items() for f in fs}
@@ -91,6 +96,8 @@ def check_seeds(seed_dir: Path) -> tuple[list[str], list[dict], dict[str, str]]:
     e = [f"seeds: duplicate family ids"] * (len(set(ids)) != len(ids))
     if sum(map(len, splits.values())) != len(split_of) or set(split_of) != set(ids):
         e.append(f"splits.json does not partition the families: {sorted(set(split_of) ^ set(ids))}")
+    if not review.exists() or review.read_text(encoding="utf-8") != render(seed_dir):
+        e.append(f"{review.name} is stale: run python eval/render_seed_review.py")
     items = []
     for f in fams:
         w = f"seed {f.get('family_id')}"
@@ -160,10 +167,19 @@ def check_scenario(path: Path, split: str, split_of: dict[str, str], lim: dict) 
             e.append(f"{w}: persistence memory {p.get('id')} needs all fields, a P id and a time after the observation")
     if split_of.get(d["family"]) != split:
         e.append(f"{w}: family {d['family']!r} is in split {split_of.get(d['family'])!r}, not {split!r}")
-    item = {"name": w, "split": split, "category": d["category"], "domain": d["domain"],
+    item = {"name": w, "split": split, "family": d["family"], "category": d["category"], "domain": d["domain"],
             "obs": d["observation"]["text"], "actions": g.get("actions", {}),
             "texts": _texts(mems + pers, d["observation"]), "questions": [q["q"] for q in g.get("eval_questions", [])]}
     return e, item
+
+
+def check_counts(items: list[dict], split_of: dict[str, str], per_family: dict[str, int]) -> list[str]:
+    """Every family of a split that has scenarios has exactly dataset.scenarios_per_family[split] of them."""
+    have = {(i["split"], i["family"]) for i in items}
+    n = {k: sum((i["split"], i["family"]) == k for i in items) for k in have}
+    return [f"{s}/{f}: {n.get((s, f), 0)} scenarios, need {per_family[s]}"
+            for f, s in sorted(split_of.items(), key=lambda x: (x[1], x[0]))
+            if any(i["split"] == s for i in items) and n.get((s, f), 0) != per_family[s]]
 
 
 def reference_texts() -> list[str]:
@@ -219,6 +235,7 @@ def main(argv: list[str] | None = None) -> int:
         e, item = check_scenario(path, path.parent.name, split_of, lim)
         errs += e
         scen_items += [item] if item else []
+    errs += check_counts(scen_items, split_of, lim["scenarios_per_family"])
     ref = reference_texts()
     for label, items in (("seed families", seed_items), ("scenarios", scen_items)):
         if items:

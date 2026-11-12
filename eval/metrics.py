@@ -32,7 +32,12 @@ The assistant answer is correct if it gives the same information about the CURRE
 - If the reference says the answer is unknown or that something no longer holds, the assistant answer is correct only
   if it does not assert a current value that the reference rules out.
 - If the reference gives a definite answer, "unknown" is incorrect.
-Return JSON only: {{"correct": true | false}}"""
+{pending}Return JSON only: {{"correct": true | false}}"""
+# Added to QA_JUDGE_PROMPT only for questions marked "pending" (backed by a VERIFY memory, DATASET_NOTE); other
+# questions get the exact original prompt, so their cached judge calls stay valid.
+QA_JUDGE_PENDING = """- The reference comes from a memory pending verification of a reported, unconfirmed change. A hedge that
+  mentions the unconfirmed change is consistent with the reference; asserting that the change happened contradicts it.
+"""
 
 
 @dataclass
@@ -89,10 +94,12 @@ def candidate_recall(rec: Record) -> Counts:
     return {"candidate_recall": (len(need & set(rec.trace.candidates)), len(need))}
 
 
-def qa_judge(question: str, gold_answer: str, ans: str, cfg: dict) -> bool:
+def qa_judge(question: str, gold_answer: str, ans: str, cfg: dict, pending: bool = False) -> bool:
     """LLM grade of one answer against the gold answer. A malformed response is retried once (try_json_valid, with a
     changed prompt); if still malformed it counts as incorrect and as a "qa_judge" fallback."""
-    out = llm.try_json_valid(QA_JUDGE_PROMPT.format(question=question, gold=gold_answer, answer=ans),
+    prompt = QA_JUDGE_PROMPT.format(question=question, gold=gold_answer, answer=ans,
+                                    pending=QA_JUDGE_PENDING if pending else "")
+    out = llm.try_json_valid(prompt,
                              lambda o: isinstance(o.get("correct"), bool),
                              model=cfg["llm"]["judge_model"], max_tokens=cfg["judge_max_tokens"], cfg=cfg)
     if out is None:
@@ -104,7 +111,8 @@ def qa_judge(question: str, gold_answer: str, ans: str, cfg: dict) -> bool:
 def _qa(rec: Record, cfg: dict, later: list[Memory] = ()) -> tuple[int, int]:
     mems = [r for m in rec.store.all() if (r := render(m))] + list(later)  # what the agent sees after the commit
     qs = rec.scenario.gold.eval_questions
-    return sum(qa_judge(e["q"], e["gold_answer"], answer(e["q"], mems, cfg=cfg), cfg) for e in qs), len(qs)
+    return sum(qa_judge(e["q"], e["gold_answer"], answer(e["q"], mems, cfg=cfg), cfg, e.get("pending", False))
+               for e in qs), len(qs)
 
 
 def qa(rec: Record, cfg: dict) -> Counts:

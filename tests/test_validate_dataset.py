@@ -28,6 +28,19 @@ def test_seeds_valid_and_split():
     assert Counter(split_of.values()) == {"test": 18, "val": 8, "train": 34}
 
 
+def test_stale_review_fails(tmp_path):
+    stale = tmp_path / "seed_review.md"
+    stale.write_text("old", encoding="utf-8")
+    assert any("stale" in e for e in vd.check_seeds(ROOT / "data/seeds", stale)[0])
+
+
+def test_scenario_counts_per_family():
+    split_of = {"a": "test", "b": "test", "c": "val"}
+    items = [{"split": "test", "family": "a"}] * 2 + [{"split": "test", "family": "b"}]
+    # b is short; val has no scenarios yet, so it is not checked
+    assert vd.check_counts(items, split_of, {"test": 2, "val": 13}) == ["test/b: 1 scenarios, need 2"]
+
+
 def _scenario(fam):
     """A scenario built from a seed family: core memories + fillers to 30, 3 persistence memories."""
     mems = [{k: m[k] for k in ("id", "text", "entity", "attribute", "source")} | {"time": "2026-01-01T10:00:00"}
@@ -62,6 +75,8 @@ def _break(d, how):
         g["actions"] = {m["id"]: g["actions"][m["id"]] for m in d["memories"]}
     elif how == "family":
         d["family"] = "one_hop__vehicle"  # a train family, file sits in test/
+    elif how == "pending":
+        g["eval_questions"][0]["pending"] = True  # two_hop__vehicle M3 is REVISE, not VERIFY
     elif how == "convention":
         g["actions"]["M2"] = "CONDITIONAL"  # two_hop scenario
     return d
@@ -70,7 +85,8 @@ def _break(d, how):
 @pytest.mark.parametrize("how,msg", [("action", "invalid action"), ("missing_label", "do not cover"),
                                      ("dep", "not a pair of known ids"), ("depends_on", "depends_on"),
                                      ("pers_time", "after the observation"), ("too_few", "29 memories"),
-                                     ("family", "is in split"), ("convention", "CONDITIONAL only")])
+                                     ("family", "is in split"), ("convention", "CONDITIONAL only"),
+                                     ("pending", "pending: true iff")])
 def test_scenario_checks(tmp_path, how, msg):
     split_of = vd.check_seeds(ROOT / "data/seeds")[2]
     fams = {f["family_id"]: f for f in json.loads((ROOT / "data/seeds/seeds.json").read_text("utf-8"))["families"]}
