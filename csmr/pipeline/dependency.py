@@ -50,7 +50,7 @@ def dependency_features(root: Memory, cand: Memory, delta: StateChange, obs: Obs
         "nli_entail": models.nli(root.text, cand.text)["entailment"],
         # NLI calls unrelated sentences "contradictions"; only meaningful for topically related pairs
         "nli_contra_topical": models.nli(stmt, cand.text)["contradiction"] * cos,
-        "temporal_after": float(cand.time > root.time),
+        "temporal_after": float(cand.created_at > root.created_at),  # written after, whatever was re-dated since
         "same_source": float(root.source == cand.source),
         "causal_cue": CUE_SCORE[str(cue["answer"]).strip().lower()[0]],
         "hop_closeness": cfg["hop_closeness"].get(info.hop, cfg["hop_default"]),

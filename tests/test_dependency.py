@@ -3,7 +3,7 @@ import pytest
 from csmr import llm
 from csmr.adapters.memory import InMemoryAdapter
 from csmr.config import load_config
-from csmr.pipeline import dependency
+from csmr.pipeline import dependency, evidence
 from csmr.pipeline.candidates import build_candidates
 from csmr.scenario import load_scenario
 from csmr.types import StateChange
@@ -92,10 +92,26 @@ def test_temporal_after_is_per_root_pair(monkeypatch):
     sc = load_scenario("data/dev/car_sale_distractors.json")
     store, d = InMemoryAdapter(sc.memories), _car_delta(sc)
     info = build_candidates(d, sc.observation, ["M1"], store)["M2"]
-    newer_root = store.get("M1").__class__(**{**store.get("M1").__dict__, "id": "OBS26", "time": "2026-06-02T09:00:00"})
+    newer_root = store.get("M1").__class__(**{**store.get("M1").__dict__, "id": "OBS26", "time": "2026-06-02T09:00:00",
+                                              "created_at": None})
     tf = lambda root, cand: dependency.dependency_features(root, cand, d, sc.observation, info)["temporal_after"]
     m6 = store.get("M6")  # 2026-03-02
     assert (tf(store.get("M1"), m6), tf(newer_root, m6)) == (1.0, 0.0)
+
+
+def test_temporal_after_and_freshness_use_created_at_not_the_displayed_date(monkeypatch):
+    monkeypatch.setattr(llm, "call", lambda p, **k: {"answer": "no"})
+    sc = load_scenario("data/dev/car_sale_distractors.json")
+    store, d = InMemoryAdapter(sc.memories), _car_delta(sc)
+    info = build_candidates(d, sc.observation, ["M1"], store)["M2"]
+    root, cand = store.get("M6"), store.get("M1")  # root written 2026-03-02; cand written 2026-03-01 (before it)
+    feats = lambda: (dependency.dependency_features(root, cand, d, sc.observation, info)["temporal_after"],
+                     evidence.evidence_features(cand, d, sc.observation, info)["freshness"])
+    assert feats() == (0.0, 1.0)  # obs 2026-06-01 is after cand
+    store.update("M1", text="revised", time="2027-01-01T00:00:00")  # re-dated past both the root and the observation
+    assert (cand.time, cand.created_at) == ("2027-01-01T00:00:00", "2026-03-01T10:00:00")
+    assert cand.history[0]["time"] == "2026-03-01T10:00:00"
+    assert feats() == (0.0, 1.0)  # unchanged: by `time` they would now be (1.0, 0.5)
 
 
 @pytest.mark.parametrize("ans,cue", [("yes", 1.0), ("Maybe", 0.5), ("no", 0.0)])

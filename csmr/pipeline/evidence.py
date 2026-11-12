@@ -51,7 +51,7 @@ def evidence_features(cand: Memory, delta: StateChange, obs: Observation, info: 
         "not_temporary": float(not info.temporary),
         "corroboration": min(corroboration, cfg["corroboration_cap"]) / cfg["corroboration_cap"],
         "extraction_conf": delta.confidence,
-        "freshness": 1.0 if obs.time >= cand.time else 0.5,
+        "freshness": 1.0 if obs.time >= cand.created_at else 0.5,
     }
 
 

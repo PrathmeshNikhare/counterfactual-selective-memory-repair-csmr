@@ -7,6 +7,7 @@ Every section maps to the paper (`docs/paper.pdf`). Signatures are the contract 
 ## 0. Shared types (`csmr/types.py`) — already written
 
 `Action`, `Memory`, `StateChange`, `CandidateInfo`, `RepairSet`, `Trace`. See file.
+`Memory` has two dates: `time` = date of the current version (shown to the agent, §9; REVISE / CONDITIONAL set it to the observation time, §8, §11) and `created_at` = when the memory was first written (defaults to `time` on construction, never changed by `update()`). Features that ask "when was this written" (`temporal_after` §4, `freshness` §5) use `created_at`.
 
 ## 1. Infrastructure
 
@@ -86,7 +87,7 @@ Features (all in [0,1]):
 | `same_attribute` | 1/0 |
 | `nli_entail` | nli(root.text, cand.text).entailment |
 | `nli_contra_topical` | nli(delta.statement, cand.text).contradiction × `cos_sim` (NLI contradiction is only meaningful for topically related pairs; unrelated sentences score ≈1 otherwise; falls back to "The {entity}'s {attribute} is now {new}." if statement is empty) |
-| `temporal_after` | cand written after root (1/0), per (root, cand) pair; ISO timestamps compare correctly as strings |
+| `temporal_after` | cand written after root (1/0), per (root, cand) pair, by `created_at` (a re-dated memory does not become "after"); ISO timestamps compare correctly as strings |
 | `same_source` | 1/0 |
 | `causal_cue` | graded LLM answer (JSON `{"answer": "yes"|"maybe"|"no"}`) → yes 1.0, maybe 0.5, no 0.0 (by first letter): "Stored fact A: {root.text}. It changed: {delta.statement}. Is statement B now likely FALSE or OUT OF DATE because of this change? Answer one word: yes, maybe, or no. B: {cand.text}". Stricter than "needs re-checking": unrelated facts about the same subject (language, cache) should answer no. |
 | `hop_closeness` | 1.0 hop0, 0.6 hop1, 0.3 hop2 |
@@ -110,7 +111,7 @@ def fit_evidence(X, y) -> None
 | `not_temporary` | 1 − temporary flag; temporary = `delta.temporary` (extractor, §2) OR `cfg.temporary_patterns` regex on the observation (this week, for now, temporarily, until, for a few days, for a week, at the moment) |
 | `corroboration` | min(count of supporting observations, 3)/3 |
 | `extraction_conf` | delta.confidence |
-| `freshness` | 1.0 if obs.time ≥ cand.time else 0.5 |
+| `freshness` | 1.0 if obs.time ≥ cand.created_at else 0.5 |
 
 Also expose flags `hedged: bool`, `temporary: bool` on `CandidateInfo` (used by the action rule).
 
@@ -161,7 +162,7 @@ REVISE and CONDITIONAL (`REDATED_ACTIONS`) also set the memory's `time` to the o
 ```python
 def answer(question: str, memories: list[Memory], k: int = 5, cfg=None) -> str
 ```
-Retrieve top-k by cosine to the question from the given memory list; LLM answers using ONLY those memories. Each retrieved memory is shown with the date it was recorded, `- [YYYY-MM-DD] <text>` (`memory.time[:10]`; "undated" if empty). Instructions: if memories conflict, rely on the most recent one; answer exactly "unknown" only when no retrieved memory addresses the question. This is identical for every method (CSMR selection and validation, baselines, eval); no method may change the prompt. The date is `Memory.time`; a REVISE'd or CONDITIONAL memory carries the date of the observation that changed it (§8, §11). An empty LLM answer is retried once (changed prompt, double max tokens), then replaced by "unknown"; an empty answer never reaches the judge. Memories rendered with an `[unverified]` prefix (VERIFY) are flagged in the prompt ("Memories marked [unverified] may be outdated; mention the uncertainty."), so the agent surfaces the uncertainty instead of asserting the stale fact. Same agent is used by all baselines and by eval.
+Retrieve top-k by cosine to the question from the given memory list; LLM answers using ONLY those memories. Each retrieved memory is shown with the date it was recorded, `- [YYYY-MM-DD] <text>` (`memory.time[:10]`; "undated" if empty). Instructions: if memories conflict, rely on the most recent one; answer exactly "unknown" only when no retrieved memory addresses the question. This is identical for every method (CSMR selection and validation, baselines, eval); no method may change the prompt. The date is `Memory.time`, the date of the current version (not `created_at`); a REVISE'd or CONDITIONAL memory carries the date of the observation that changed it (§8, §11). An empty LLM answer is retried once (changed prompt, double max tokens), then replaced by "unknown"; an empty answer never reaches the judge. Memories rendered with an `[unverified]` prefix (VERIFY) are flagged in the prompt ("Memories marked [unverified] may be outdated; mention the uncertainty."), so the agent surfaces the uncertainty instead of asserting the stale fact. Same agent is used by all baselines and by eval.
 
 ## 10. Counterfactual selection (`pipeline/counterfactual.py`) — Paper IV-D, V
 

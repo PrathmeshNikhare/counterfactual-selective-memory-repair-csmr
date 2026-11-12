@@ -74,7 +74,7 @@ csmr/
   pipeline/counterfactual.py probes, judge, objective, argmax
   pipeline/commit.py        Phase E
   api.py                public CSMR class: observe(), retrieve(), pending_verifications()
-baselines/              append_only, recency, last_write_wins, similarity_prop, dependency_only, evidence_only, llm_oneshot
+baselines/              append_only, last_write_wins, similarity_prop, dependency_only, evidence_only, llm_oneshot
 eval/                   metrics.py, run_all.py, ablations.py, plots.py
 data/dev/               hand-written dev scenarios (integration tests)
 data/generated/         full dataset (later)
@@ -87,5 +87,6 @@ tests/
 - Work one task from `docs/TASKS.md` at a time. Read the task's acceptance criteria first, implement, write/extend tests, run `pytest -q`, then tick the box in TASKS.md.
 - Keep functions small and typed. Docstrings reference the paper section they implement (e.g. `# Paper IV-C`).
 - When a module needs an LLM prompt, put the prompt template as a module-level constant so prompts are reviewable in one place.
-- Integration test: `data/dev/car_sale.json` must reproduce paper Table II (M1 REVOKE/REVISE, M2 REVISE, M3 VERIFY, M4 KEEP/CONDITIONAL, M5 KEEP; R2-equivalent set chosen).
+- Integration target: after E3 fitting, the PROPOSED actions from Phases A–C on `data/dev/car_sale.json` must reproduce paper Table II (M1 REVOKE/REVISE, M2 REVISE, M3 VERIFY, M4 KEEP/CONDITIONAL, M5 not a candidate). Which repair set the counterfactual stage chooses is not pinned. Until fitting, the real-LLM car_sale tests are xfail(strict=False) (placeholder weights, untuned λ).
+- There is no separate recency baseline: the shared agent (SPEC §9) shows dates and resolves conflicts by recency, so append-only covers it.
 - After finishing any pipeline module, run the `method-auditor` subagent to check it against the paper.

@@ -25,12 +25,16 @@ class Memory:
     text: str
     entity: str
     attribute: str
-    time: str                      # ISO 8601
+    time: str                      # ISO 8601; date of the current version (what the agent is shown)
     source: str = "user"           # user | tool | third_party | inferred
     status: str = "active"         # active | revoked | conditional | pending_verify
     version: int = 1
     condition: Optional[str] = None
     history: list[dict[str, Any]] = field(default_factory=list)  # previous versions, never deleted
+    created_at: Optional[str] = None  # when the memory was first written; defaults to `time`, never changed by updates
+
+    def __post_init__(self) -> None:
+        self.created_at = self.created_at or self.time
 
     def to_dict(self) -> dict:
         return asdict(self)
