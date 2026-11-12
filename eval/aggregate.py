@@ -1,4 +1,4 @@
-"""Merge raw per-scenario results (eval/run_all.py) into results/<tag>/: main.csv, per_category.csv, persistence.csv,
+"""Merge raw per-scenario results (eval/run_all.py) into results/<tag>/<split>/: main.csv, per_category.csv, persistence.csv,
 cost.csv, summary.md. Values are pooled with 95% scenario-level bootstrap CIs (eval.metrics.aggregate, Spec 14)."""
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--force", action="store_true", help="merge results with different config hashes / git commits")
     args = ap.parse_args(argv)
     recs, cfg = load(args.tag, args.split, args.force), load_config()
-    out = RESULTS / args.tag
+    out = RESULTS / args.tag / args.split
     out.mkdir(parents=True, exist_ok=True)
     main_df = table(recs, ["method"], MAIN, cfg)
     main_df.to_csv(out / "main.csv", index=False)

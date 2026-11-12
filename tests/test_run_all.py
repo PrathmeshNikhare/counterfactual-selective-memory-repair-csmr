@@ -82,9 +82,9 @@ def test_aggregate_writes_tables_and_refuses_hash_mismatch(env):
     calls, tmp = env
     _go()
     aggregate.main(["--tag", "t", "--split", "dev"])
-    main = (tmp / "t/main.csv").read_text().splitlines()
+    main = (tmp / "t/dev/main.csv").read_text().splitlines()
     assert main[0].startswith("method,n_scenarios,action_accuracy") and len(main) == 3
-    assert {"per_category.csv", "persistence.csv", "cost.csv", "summary.md"} <= {p.name for p in (tmp / "t").iterdir()}
+    assert {"per_category.csv", "persistence.csv", "cost.csv", "summary.md"} <= {p.name for p in (tmp / "t/dev").iterdir()}
 
     f = next((tmp / "raw/t/dev/b").glob("*.json"))
     f.write_text(json.dumps({**json.loads(f.read_text()), "config_hash": "other"}))
