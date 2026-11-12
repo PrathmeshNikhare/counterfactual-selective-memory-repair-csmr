@@ -203,6 +203,8 @@ def judge(answer: str, question: str, delta, obs, cfg, source_text: str = "") ->
 # Probes name the specific subject as the memory text does (e.g. "ShopKart"), never a generic stand-in; the attribute key is never shown to the probe prompt.
 # Both fields are stored per probe and per repair set in the trace ("judgements").
 def score(rs, ...) -> dict  # {"benefit","collateral","evidence_cost","size","total"}
+def objective(benefit, rs, cands, cfg) -> dict  # the same dict from a known Benefit (no LLM); used by score and eval/fit.py
+def argmax(scored, cfg) -> RepairSet            # best total, ties within tie_eps -> smaller |R|; used by select and eval/fit.py
 def select(repair_sets, ...) -> tuple[RepairSet, list[dict]]
 ```
 Objective (paper Section V):
@@ -322,3 +324,8 @@ Definitions (gold = `gold.actions`; pred = `final_actions`; changed = pred ∈ {
 
 `run_all.py --split test --methods all [--tag T] [--shard i/n]` → one raw JSON per (method, scenario) in `results/raw/T/test/` (resumable; errors → `results/raw/T/errors.jsonl`). `aggregate.py --tag T --split test` → `results/T/test/main.csv`, `per_category.csv`, `persistence.csv`, `cost.csv`, `summary.md`; refuses mixed config hashes / git commits unless `--force`.
 `ablations.py` → `results/ablations.csv`. `plots.py` → λc sweep plot (repair recall vs over-invalidation).
+
+**Fitting and tuning (`eval/fit.py`, TASKS E3).** Training code: it reads gold.
+- `train [--shard i/n]`: Phases A–C (`run.phase_a`, `run.phase_bc`, every ablation flag on) per train scenario → `results/fit/<tag>/train/<id>.json` (resumable). Unsharded, it then fits `fit_dependency` / `fit_evidence` → `models/*.json` and writes `train_summary.json`. Rows: **dependency** = every non-root candidate, y = it is a dependent in `gold.dependencies` (pipeline roots left out, as in the dependency metric, and so are gold roots Phase A missed; features are the trace's, i.e. of the max-P_dep root). **Evidence** = every affected candidate (gold action not KEEP, or a gold dependent, e.g. one kept because the evidence is "maybe"), y = gold ∈ {REVISE, REVOKE}; other gold-KEEP candidates carry no evidence label and are left out.
+- `val [--shard i/n]`: CSMR once on val through `run_all.run` (raw format, sharding, resume) → `results/raw/<tag>/val/csmr/`. Refuses without fitted models (`--allow-handset`) or with an ablation flag off.
+- `tune`: grid `cfg.fit.<key>_grid` over τd, τe, λc, λs, λe. Per (τd, τe) the repair sets are rebuilt from the saved P_dep / S with `propose_action` + `generate_repair_sets`; a feasible set's Benefit is reused from the trace when the val run scored a set with the same actions, otherwise computed online with the saved probes (`--offline-only`: the point is left unscored). λs only enter `counterfactual.objective` / `counterfactual.argmax` (shared with the pipeline). Approximation: probes stay those of the val run, although τd (eligibility) and τe (capping priority) also decide which candidates get a probe. Refuses if `config.yaml` / `models/*.json` changed since the val run (config hash; the `fit` grids are excluded from the hash). Selection: max pooled repair F1 − over-invalidation (all val scenarios scored); ties → first in grid order. Writes `config/tuned.yaml` (the five keys) and `results/fit/<tag>/grid.csv` (every point).

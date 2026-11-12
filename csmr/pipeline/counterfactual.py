@@ -234,7 +234,12 @@ def _evaluate(rs: RepairSet, probes: list[dict], store: MemoryStoreAdapter, revi
                           **judge(a, q, delta, obs, cfg, p["source_text"])}
         details.append(cache[key])
     vals = [d["score"] for d in details]
-    benefit = sum(vals) / len(vals) if vals else 0.0
+    return objective(sum(vals) / len(vals) if vals else 0.0, rs, cands, cfg), details
+
+
+def objective(benefit: float, rs: RepairSet, cands: dict[str, CandidateInfo], cfg: dict) -> dict[str, float]:
+    """Section V objective for a given Benefit; everything but Benefit comes from rs, P_dep and cfg (no LLM).
+    Shared with eval/fit.py, which re-scores saved Benefits under other lambdas."""
     collateral = sum(1 - cands[m].p_dep for m, a in rs.actions.items() if a in MODIFYING_ACTIONS)
     rewrites = sum(a in (Action.REVISE, Action.CONDITIONAL) for a in rs.actions.values())  # one rewrite LLM call each
     evidence_cost = (sum(a == Action.VERIFY for a in rs.actions.values()) * cfg["verify_cost"]
@@ -242,8 +247,13 @@ def _evaluate(rs: RepairSet, probes: list[dict], store: MemoryStoreAdapter, revi
     lc, ls = (cfg["lambda_c"], cfg["lambda_s"]) if cfg["ablation"]["use_minimality"] else (0.0, 0.0)
     size = rs.size()
     total = benefit - lc * collateral - cfg["lambda_e"] * evidence_cost - ls * size
-    return ({"benefit": benefit, "collateral": collateral, "evidence_cost": evidence_cost, "size": size,
-             "total": total}, details)
+    return {"benefit": benefit, "collateral": collateral, "evidence_cost": evidence_cost, "size": size, "total": total}
+
+
+def argmax(scored: list[RepairSet], cfg: dict) -> RepairSet:
+    """Best scored feasible set; totals within tie_eps are tied -> smaller |R| (then the earlier set)."""
+    top = max(r.score["total"] for r in scored)
+    return min((r for r in scored if r.score["total"] >= top - cfg["tie_eps"]), key=lambda r: r.score["size"])
 
 
 def score(rs: RepairSet, probes: list[dict], store: MemoryStoreAdapter, revised: dict[str, str],
@@ -265,8 +275,7 @@ def select(repair_sets: list[RepairSet], probes: list[dict], store: MemoryStoreA
         for rs in feasible:
             rs.score, details[rs.name] = _evaluate(rs, probes, store, revised, conditions, cands, delta, obs, cfg,
                                                    cache, new_mem)
-        top = max(r.score["total"] for r in feasible)  # near-ties (within tie_eps) fall through to smaller |R|
-        best = min((r for r in feasible if r.score["total"] >= top - cfg["tie_eps"]), key=lambda r: r.score["size"])
+        best = argmax(feasible, cfg)
     else:  # ablation (SPEC §10): R3 = apply all proposed actions; dedup may have renamed it to a lower-index twin
         r3 = [rs for rs in repair_sets if rs.name <= "R3"][-1]
         # hard rules still bind: an infeasible R3 (weak-evidence root forced to REVISE) falls back to the largest feasible lower set
