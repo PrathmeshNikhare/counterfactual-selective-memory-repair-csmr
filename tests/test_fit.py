@@ -91,6 +91,12 @@ def test_label_rows_weak_evidence_dependent_and_missed_root():
     assert [(r["memory"], r["label"]) for r in rows["evidence"]] == [("M1", 1), ("M2", 1), ("M4", 0)]
 
 
+def test_label_rows_leave_conditional_out_of_evidence():
+    rows = fit.label_rows(_cands(0), GoldLabels({**GOLD, "M2": "CONDITIONAL"}, DEPS, []))
+    assert [(r["memory"], r["label"]) for r in rows["evidence"]] == [("M1", 1), ("M4", 0)]  # VERIFY stays, y = 0
+    assert [r["memory"] for r in rows["dependency"]] == ["M2", "M3", "M4"]  # dependency rows unaffected
+
+
 def test_train_fits_and_saves_both_models(env, train_env):
     cfg = load_config(overrides=["ablation.use_dependency=false"])
     summary = fit.train("t", "1/1", cfg)
@@ -125,8 +131,8 @@ def test_val_runs_csmr_through_run_all(env, monkeypatch):
     monkeypatch.setattr(run_all, "run", lambda *a: got.append(a) or 0)
     with pytest.raises(SystemExit, match="fitted models missing"):
         fit.val("t", "2/3", CFG, [])
-    fit.val("t", "2/3", CFG, ["x=1"], allow_handset=True)
-    assert got == [("val", ["csmr"], "t", "2/3", CFG, ["x=1"])]
+    fit.val("t", "2/3", CFG, ["x=1"], allow_handset=True, overlay="o.yaml")
+    assert got == [("val", ["csmr"], "t", "2/3", CFG, ["x=1"], "o.yaml")]
     with pytest.raises(SystemExit, match="full method"):
         fit.val("t", "1/1", load_config(overrides=["ablation.use_minimality=false"]), [], allow_handset=True)
 
@@ -142,11 +148,12 @@ V1_SETS = [("R0", {}, 0.3), ("R1", {"M1": "REVOKE"}, 0.6), ("R2", {"M1": "REVOKE
            ("R4", {"M1": "REVOKE", "M2": "REVISE", "M3": "REVISE"}, 1.0)]
 
 
-def _raw(env, sid, trace):
+def _raw(env, sid, trace, overlay=None):
     p = env / "results/raw/t/val/csmr" / f"{sid}.json"
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps({"split": "val", "tag": "t", "config_hash": run_all.config_hash(CFG), "git_commit": "g",
-                             "overrides": [],
+    cfg = load_config(overlay=overlay)
+    p.write_text(json.dumps({"split": "val", "tag": "t", "config_hash": run_all.config_hash(cfg, overlay),
+                             "git_commit": "g", "overrides": [], "config_overlay": overlay,
                              "method": "csmr", "scenario": sid, "trace": trace.to_dict()}))
 
 
@@ -196,9 +203,26 @@ def test_lambda_c_grid_offline(val_env):
 
 def test_tune_refuses_a_config_changed_since_the_val_run(val_env, monkeypatch):
     assert run_all.config_hash({**CFG, "fit": {}}) == run_all.config_hash(CFG)  # grids may change freely
-    monkeypatch.setattr(fit, "load_config", lambda overrides=None: {**CFG, "tie_eps": 0.5})
+    monkeypatch.setattr(fit, "load_config", lambda overrides=None, overlay=None: {**CFG, "tie_eps": 0.5})
     with pytest.raises(SystemExit, match="changed since the val run"):
         fit.tune("t", _grid(), out=val_env / "tuned.yaml")
+
+
+def test_tune_rebuilds_the_val_config_from_the_recorded_overlay(val_env):
+    # val run made with an overlay lambda_c .1 (R4 wins, see above); tune gets no overlay flag of its own
+    ov = val_env / "ov.yaml"
+    ov.write_text("lambda_c: 0.1\nlambda_s: 0.0\nlambda_e: 0.0\n")
+    for sid in ("v1", "v2"):
+        rec_path = val_env / f"results/raw/t/val/csmr/{sid}.json"
+        _raw(val_env, sid, Trace(**{k: v for k, v in json.loads(rec_path.read_text())["trace"].items()}), str(ov))
+    rec = json.loads((val_env / "results/raw/t/val/csmr/v1.json").read_text())
+    s = fit.load_saved(rec, val_env / "val/v1.json")
+    base = load_config(overlay=str(ov))
+    assert fit.choose(s, fit.feasible_sets(s, base, False, {"filled": 0}), base)["M3"] == "REVISE"
+    fit.tune("t", _grid(), offline_only=True, out=val_env / "tuned.yaml")  # hash check passes with the overlay
+    ov.write_text("lambda_c: 0.25\n")
+    with pytest.raises(SystemExit, match="overlay"):
+        fit.tune("t", _grid(), offline_only=True, out=val_env / "tuned.yaml")
 
 
 def test_tau_change_needs_online_benefit_once(val_env, monkeypatch):

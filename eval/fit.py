@@ -15,8 +15,11 @@ Training rows (labels from gold):
   missed (they are the memories most affected, not "independent"). Features are the trace's: for a candidate with
   several roots, those of the root with the highest P_dep under the weights active at extraction.
 - evidence: every candidate the change affects: gold action not KEEP, or a gold dependent (a dependent kept because
-  the evidence is weak, e.g. "maybe"); y = gold is REVISE or REVOKE, i.e. the evidence was enough to modify it. Other
-  gold-KEEP candidates are unaffected whatever the evidence, so they carry no evidence label and are left out.
+  the evidence is weak, e.g. "maybe"); y = gold is REVISE or REVOKE, i.e. the evidence was enough to modify it
+  (VERIFY = not enough). Other gold-KEEP candidates are unaffected whatever the evidence, and gold CONDITIONAL is
+  decided by the temporary flag, not evidence strength: both carry no evidence label and are left out.
+--config-overlay PATH (all steps): yaml loaded on top of config.yaml and included in the config hash. tune rebuilds
+the val run's config from the overlay and --set items recorded in its raw files, not from its own flags.
 
 Tuning (offline where possible): tau_d / tau_e change the proposed actions and hence R0..R4 and feasibility; lambdas
 change only the objective. For every grid point the repair sets are rebuilt from the saved P_dep / S
@@ -79,7 +82,8 @@ def label_rows(cands: dict[str, CandidateInfo], gold: GoldLabels) -> dict[str, l
     dep = [{"memory": m, "features": i.dep_features, "label": int(m in gold_dep)}
            for m, i in cands.items() if not i.is_root and m not in gold_roots and i.dep_features]
     ev = [{"memory": m, "features": i.ev_features, "label": int(acts[m] in MODIFYING_ACTIONS)}
-          for m, i in cands.items() if (acts[m] != Action.KEEP or m in gold_dep) and i.ev_features]
+          for m, i in cands.items()
+          if (acts[m] != Action.KEEP or m in gold_dep) and acts[m] != Action.CONDITIONAL and i.ev_features]
     return {"dependency": dep, "evidence": ev}
 
 
@@ -92,12 +96,14 @@ def extract_rows(sc: Scenario, cfg: dict) -> dict[str, list[dict]]:
     return label_rows(phase_bc(delta, sc.observation, roots, store, cfg), sc.gold)
 
 
-def train(tag: str, shard_spec: str, cfg: dict, force: bool = False) -> dict | None:
-    """Extract missing feature rows for this shard; fit when unsharded. Returns the fit summary (None if sharded)."""
+def train(tag: str, shard_spec: str, cfg: dict, force: bool = False, overlay: str | None = None) -> dict | None:
+    """Extract missing feature rows for this shard; fit when unsharded. Returns the fit summary (None if sharded).
+    cfg must already include `overlay`; it is passed for the hash."""
     fcfg = copy.deepcopy(cfg)
     fcfg["ablation"] = {k: True for k in fcfg["ablation"]}  # features need every stage on
     out_dir = _fit_dir(tag) / "train"
-    meta = {"config_hash": run_all.config_hash(fcfg), "git_commit": run_all.git_commit()}
+    meta = {"config_hash": run_all.config_hash(fcfg, overlay), "git_commit": run_all.git_commit(),
+            "config_overlay": overlay}
     for path in run_all.shard(run_all.scenario_paths("train"), shard_spec):
         sc = load_scenario(path)
         out = out_dir / f"{sc.id}.json"
@@ -147,14 +153,15 @@ def fit_models(rows_dir: Path, force: bool = False) -> dict:
 
 # ---------------------------------------------------------------- (2a) val: one CSMR run, run_all raw format
 
-def val(tag: str, shard_spec: str, cfg: dict, overrides: list[str], allow_handset: bool = False) -> int:
+def val(tag: str, shard_spec: str, cfg: dict, overrides: list[str], allow_handset: bool = False,
+        overlay: str | None = None) -> int:
     """CSMR on val with the fitted classifiers -> results/raw/<tag>/val/csmr/ (run_all; resumable, shardable)."""
     if not _full_method(cfg):
         raise SystemExit(f"tuning needs the full method; ablation flags are {cfg['ablation']}")
     missing = [str(p) for p in (dependency._MODEL_FILE, evidence._MODEL_FILE) if not p.exists()]
     if missing and not allow_handset:
         raise SystemExit(f"fitted models missing {missing}; run `fit.py train` first or pass --allow-handset")
-    return run_all.run("val", ["csmr"], tag, shard_spec, cfg, overrides)
+    return run_all.run("val", ["csmr"], tag, shard_spec, cfg, overrides, overlay)
 
 
 # ---------------------------------------------------------------- (2b) tune: grid search on saved traces
@@ -238,9 +245,11 @@ def tune(tag: str, cfg: dict, offline_only: bool = False, out: Path | None = Non
     recs = [r for r in aggregate.load(tag, "val") if r["method"] == "csmr"]
     if not recs:
         raise SystemExit(f"no csmr val results under tag {tag!r}; run `fit.py val` first")
-    base = load_config(overrides=recs[0]["overrides"])  # aggregate.load refused mixed config hashes
-    if run_all.config_hash(base) != recs[0]["config_hash"]:
-        raise SystemExit("config.yaml or models/*.json changed since the val run; rerun `fit.py val` with a new --tag")
+    overlay = recs[0].get("config_overlay")  # aggregate.load refused mixed config hashes
+    base = load_config(overrides=recs[0]["overrides"], overlay=overlay)
+    if run_all.config_hash(base, overlay) != recs[0]["config_hash"]:
+        raise SystemExit("config.yaml, the config overlay or models/*.json changed since the val run; "
+                         "rerun `fit.py val` with a new --tag")
     if not _full_method(base):
         raise SystemExit(f"val run used ablation flags {base['ablation']}; tuning needs the full method")
     paths = {load_scenario(p).id: p for p in run_all.scenario_paths("val")}
@@ -277,7 +286,7 @@ def tune(tag: str, cfg: dict, offline_only: bool = False, out: Path | None = Non
               f"{recs[0]['config_hash']}, git {recs[0]['git_commit']}.\n"
               f"# repair F1 {best['repair_f1']:.4f} - over-invalidation {best['over_invalidation']:.4f} = "
               f"{best['objective']:.4f}. Full grid: {fit_dir / 'grid.csv'}.\n"
-              f"# Use: --set " + " --set ".join(f"{k}={v}" for k, v in tuned.items()) + "\n")
+              f"# Use: eval/run_all.py --config-overlay {out.as_posix()}\n")
     out.write_text(header + yaml.safe_dump(tuned, sort_keys=False), encoding="utf-8")
     print(f"{len(grid)} grid points, {int(scored.sum())} scored, {stats['filled']} Benefits computed online; "
           f"chosen {tuned} objective {best['objective']:.4f} -> {out}")
@@ -295,16 +304,19 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--out", type=Path, help=f"tune: output yaml (default {TUNED.relative_to(ROOT)})")
     ap.add_argument("--env-file", help="dotenv file with LLM_API_KEY / LLM_BASE_URL (overrides .env)")
     ap.add_argument("--set", action="append", default=[], dest="overrides", metavar="KEY=VALUE")
+    ap.add_argument("--config-overlay", metavar="PATH",
+                    help="yaml loaded on top of config.yaml (e.g. config/tuned.yaml); --set still wins")
     args = ap.parse_args(argv)
     if args.env_file:
         if not Path(args.env_file).is_file():
             ap.error(f"--env-file not found: {args.env_file}")
         load_dotenv(args.env_file, override=True)
-    cfg = load_config(overrides=args.overrides)
+    cfg = load_config(overrides=args.overrides, overlay=args.config_overlay)
     if args.step == "train":
-        train(args.tag, args.shard, cfg, args.force)
+        train(args.tag, args.shard, cfg, args.force, args.config_overlay)
     elif args.step == "val":
-        print(f"done: {val(args.tag, args.shard, cfg, args.overrides, args.allow_handset)} new results")
+        n = val(args.tag, args.shard, cfg, args.overrides, args.allow_handset, args.config_overlay)
+        print(f"done: {n} new results")
     else:
         tune(args.tag, cfg, args.offline_only, args.out)
 

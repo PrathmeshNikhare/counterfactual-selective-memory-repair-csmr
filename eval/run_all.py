@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 from baselines import BASELINES
 from csmr import llm
 from csmr.adapters.memory import InMemoryAdapter
-from csmr.config import ROOT, load_config
+from csmr.config import ROOT, load_config, load_overlay
 from csmr.pipeline.run import run_pipeline
 from csmr.scenario import load_scenario
 from eval.metrics import Record, scenario_metrics
@@ -46,11 +46,15 @@ def shard(paths: list[Path], spec: str) -> list[Path]:
     return paths[i - 1::n]
 
 
-def config_hash(cfg: dict) -> str:
-    """Effective config plus any fitted weights (models/*.json are gitignored, so the commit does not cover them).
-    The `fit` block (tuning grids) is left out: it changes no run, and editing it must not invalidate val traces."""
+def config_hash(cfg: dict, overlay: str | None = None) -> str:
+    """Effective config plus any fitted weights (models/*.json are gitignored, so the commit does not cover them)
+    plus the --config-overlay's content, so runs with different overlays never merge (even when the overlay only
+    repeats config.yaml values). The `fit` block (tuning grids) is left out: it changes no run, and editing it must
+    not invalidate val traces."""
     cfg = {k: v for k, v in cfg.items() if k != "fit"}
     h = hashlib.sha256(json.dumps(cfg, sort_keys=True, default=str).encode())
+    if overlay:  # parsed content, so editing the overlay's comments does not change the hash
+        h.update(b"overlay:" + json.dumps(load_overlay(overlay), sort_keys=True, default=str).encode())
     for p in sorted((ROOT / "models").glob("*.json")):
         h.update(p.name.encode() + p.read_bytes())
     return h.hexdigest()[:16]
@@ -84,11 +88,13 @@ def _write(path: Path, obj: dict) -> None:
     os.replace(tmp, path)
 
 
-def run(split: str, methods: list[str], tag: str, shard_spec: str, cfg: dict, overrides: list[str]) -> int:
-    """Returns the number of new result files. Raises SystemExit (with a message) on QuotaExhausted."""
+def run(split: str, methods: list[str], tag: str, shard_spec: str, cfg: dict, overrides: list[str],
+        overlay: str | None = None) -> int:
+    """Returns the number of new result files. Raises SystemExit (with a message) on QuotaExhausted.
+    cfg must already include `overlay` (load_config(overlay=...)); it is passed here for the hash and the record."""
     out_dir, errors = RESULTS / "raw" / tag / split, RESULTS / "raw" / tag / "errors.jsonl"
-    meta = {"split": split, "tag": tag, "config_hash": config_hash(cfg), "git_commit": git_commit(),
-            "overrides": overrides}
+    meta = {"split": split, "tag": tag, "config_hash": config_hash(cfg, overlay), "git_commit": git_commit(),
+            "overrides": overrides, "config_overlay": overlay}
     done = 0
     for path in shard(scenario_paths(split), shard_spec):  # scenario-outer: a stopped shard has all methods per scenario
         sid = load_scenario(path).id
@@ -121,6 +127,8 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--shard", default="1/1", help="i/n, 1-based")
     ap.add_argument("--env-file", help="dotenv file with LLM_API_KEY / LLM_BASE_URL (overrides .env)")
     ap.add_argument("--set", action="append", default=[], dest="overrides", metavar="KEY=VALUE")
+    ap.add_argument("--config-overlay", metavar="PATH",
+                    help="yaml loaded on top of config.yaml (e.g. config/tuned.yaml); --set still wins")
     ap.add_argument("--tag", default="main", help='label for the output folder, e.g. "main", "abl_nodep"')
     args = ap.parse_args(argv)
     methods = list(METHODS) if args.methods == "all" else args.methods.split(",")
@@ -130,7 +138,8 @@ def main(argv: list[str] | None = None) -> None:
         if not Path(args.env_file).is_file():
             ap.error(f"--env-file not found: {args.env_file}")
         load_dotenv(args.env_file, override=True)  # llm.py's later load_dotenv(.env) does not override
-    n = run(args.split, methods, args.tag, args.shard, load_config(overrides=args.overrides), args.overrides)
+    cfg = load_config(overrides=args.overrides, overlay=args.config_overlay)
+    n = run(args.split, methods, args.tag, args.shard, cfg, args.overrides, args.config_overlay)
     print(f"done: {n} new results")
 
 
