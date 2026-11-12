@@ -21,6 +21,7 @@ from baselines import BASELINES
 from csmr import llm
 from csmr.adapters.memory import InMemoryAdapter
 from csmr.config import ROOT, load_config, load_overlay
+from csmr.pipeline import dependency, evidence
 from csmr.pipeline.run import run_pipeline
 from csmr.scenario import load_scenario
 from eval.metrics import Record, scenario_metrics
@@ -46,8 +47,15 @@ def shard(paths: list[Path], spec: str) -> list[Path]:
     return paths[i - 1::n]
 
 
+def model_digests() -> dict[str, str | None]:
+    """sha256 (16 hex) of each fitted-weights file the pipeline loads (dependency / evidence `_MODEL_FILE`),
+    None when absent (= hand-set config weights). models/*.json are gitignored, so the commit does not cover them."""
+    return {name: hashlib.sha256(p.read_bytes()).hexdigest()[:16] if p.exists() else None
+            for name, p in (("dependency", dependency._MODEL_FILE), ("evidence", evidence._MODEL_FILE))}
+
+
 def config_hash(cfg: dict, overlay: str | None = None) -> str:
-    """Effective config plus any fitted weights (models/*.json are gitignored, so the commit does not cover them)
+    """Effective config plus the fitted weights the pipeline loads (model_digests: fitted vs hand-set and which fit)
     plus the --config-overlay's content, so runs with different overlays never merge (even when the overlay only
     repeats config.yaml values). The `fit` block (tuning grids) is left out: it changes no run, and editing it must
     not invalidate val traces."""
@@ -55,8 +63,7 @@ def config_hash(cfg: dict, overlay: str | None = None) -> str:
     h = hashlib.sha256(json.dumps(cfg, sort_keys=True, default=str).encode())
     if overlay:  # parsed content, so editing the overlay's comments does not change the hash
         h.update(b"overlay:" + json.dumps(load_overlay(overlay), sort_keys=True, default=str).encode())
-    for p in sorted((ROOT / "models").glob("*.json")):
-        h.update(p.name.encode() + p.read_bytes())
+    h.update(b"models:" + json.dumps(model_digests(), sort_keys=True).encode())
     return h.hexdigest()[:16]
 
 
@@ -94,7 +101,7 @@ def run(split: str, methods: list[str], tag: str, shard_spec: str, cfg: dict, ov
     cfg must already include `overlay` (load_config(overlay=...)); it is passed here for the hash and the record."""
     out_dir, errors = RESULTS / "raw" / tag / split, RESULTS / "raw" / tag / "errors.jsonl"
     meta = {"split": split, "tag": tag, "config_hash": config_hash(cfg, overlay), "git_commit": git_commit(),
-            "overrides": overrides, "config_overlay": overlay}
+            "overrides": overrides, "config_overlay": overlay, "models": model_digests()}
     done = 0
     for path in shard(scenario_paths(split), shard_spec):  # scenario-outer: a stopped shard has all methods per scenario
         sid = load_scenario(path).id

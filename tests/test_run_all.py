@@ -5,6 +5,7 @@ import pytest
 
 from csmr import llm
 from csmr.config import load_config
+from csmr.pipeline import dependency, evidence
 from csmr.types import Trace
 from eval import aggregate, run_all
 
@@ -103,6 +104,29 @@ def test_main_passes_overlay(env, tmp_path, monkeypatch):
     run_all.main(["--split", "dev", "--methods", "a", "--config-overlay", str(ov), "--set", "tau_e=0.7"])
     split, methods, tag, shard, cfg, overrides, overlay = got[0]
     assert cfg["lambda_c"] == 0.25 and cfg["tau_e"] == 0.7 and overlay == str(ov) and overrides == ["tau_e=0.7"]
+
+
+def test_fitted_models_are_hashed_recorded_and_not_merged(env, tmp_path, monkeypatch):
+    calls, tmp = env
+    dep, ev = tmp_path / "m/dependency.json", tmp_path / "m/evidence.json"
+    monkeypatch.setattr(dependency, "_MODEL_FILE", dep)
+    monkeypatch.setattr(evidence, "_MODEL_FILE", ev)
+    handset = run_all.config_hash(CFG)
+    assert run_all.model_digests() == {"dependency": None, "evidence": None}
+    dep.parent.mkdir()
+    (tmp_path / "m/stray.json").write_text("{}")  # not a loaded model: no effect
+    assert run_all.config_hash(CFG) == handset
+    dep.write_text('{"intercept": -1.0}')
+    ev.write_text('{"intercept": -2.0}')
+    fit1 = run_all.config_hash(CFG)
+    run_all.run("dev", ["a"], "t", "1/1", CFG, [])
+    dep.write_text('{"intercept": -1.5}')  # refit
+    assert run_all.config_hash(CFG) not in (handset, fit1)
+    run_all.run("dev", ["b"], "t", "1/1", CFG, [])
+    a, b = (json.loads(next((tmp / f"raw/t/dev/{m}").glob("*.json")).read_text()) for m in "ab")
+    assert a["models"]["evidence"] == b["models"]["evidence"] and a["models"]["dependency"] != b["models"]["dependency"]
+    with pytest.raises(SystemExit, match="config_hash"):
+        aggregate.main(["--tag", "t", "--split", "dev"])
 
 
 def test_aggregate_writes_tables_and_refuses_hash_mismatch(env):
