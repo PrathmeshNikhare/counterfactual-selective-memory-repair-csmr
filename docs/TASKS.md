@@ -42,6 +42,6 @@ Integration fixture for everything: `data/dev/car_sale.json`.
 - [x] **E1 `baselines/`** — 7 baselines per SPEC §13 (no separate recency baseline: the shared agent is recency-aware; TEPA / STALE/CUPMem not reimplemented, see §13).
 - [x] **E2 `eval/metrics.py`** — all metrics per SPEC §14.
 - [ ] **E3** `fit_dependency` / `fit_evidence` on train split; tune τd, τe, λ on val.
-- [ ] **E4 `eval/run_all.py`** → results/main.csv, per_category.csv.
+- [x] **E4 `eval/run_all.py`** → results/raw/<tag>/<split>/<method>/<id>.json; `eval/aggregate.py` → results/<tag>/{main,per_category,persistence,cost}.csv + summary.md.
 - [ ] **E5 `eval/ablations.py`**, `eval/plots.py` (λc sweep).
 - [ ] **E6** error analysis: sample 20 failures, tag with paper's 6 error categories → results/errors.csv.

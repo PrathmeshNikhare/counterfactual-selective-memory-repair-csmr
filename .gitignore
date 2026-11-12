@@ -10,3 +10,5 @@ models/*.json
 .venv/
 venv/
 .claude/settings.local.json
+.vscode/
+results/*/
