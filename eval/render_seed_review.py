@@ -37,6 +37,10 @@ def render(seed_dir: Path = ROOT / "data/seeds") -> str:
         deps = ", ".join(f"{a}→{b}" for a, b in f["dependencies"]) or "none"
         out += ["", f"**Dependencies:** {deps}", "", "**Forbidden** (must not be added as hard negative or filler):"]
         out += [f"- {x}" for x in f["forbidden"]]
+        out += ["", f"**Hard negatives:** {f['hard_negative_guidance']}", ""]
+        out += [f"- e.g. {x}" for x in f["hard_negative_examples"]]
+        out += ["", f"**Persistence memories:** {f['persistence_guidance']}", ""]
+        out += [f"- e.g. {x}" for x in f["persistence_examples"]]
         out += ["", "**Eval questions**", "", "| question | gold answer | depends on | pending |", "|---|---|---|---|"]
         out += [f"| {_cell(q['q'])} | {_cell(q['gold_answer'])} | {', '.join(q['depends_on'])} | "
                 f"{'yes' if q.get('pending') else ''} |" for q in f["eval_questions"]]

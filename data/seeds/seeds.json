@@ -2313,8 +2313,8 @@
           ]
         },
         {
-          "q": "What is the user's diploma final project?",
-          "gold_answer": "None; the bakery brand-identity project no longer applies since they withdrew from the diploma.",
+          "q": "What design project is the user working on for the local bakery?",
+          "gold_answer": "Not stated; the bakery brand-identity project no longer applies since they withdrew from the diploma.",
           "depends_on": [
             "M2"
           ]
@@ -5963,8 +5963,8 @@
       ],
       "eval_questions": [
         {
-          "q": "What will the user eat at the stall near their office this Thursday?",
-          "gold_answer": "Nothing from the pani puri stall: they are on a bland diet for two weeks (normally they have pani puri there every Thursday).",
+          "q": "What does the user usually have at the stall near their office on Thursdays, and does that hold this fortnight?",
+          "gold_answer": "Pani puri; not while they're on the two-week bland diet.",
           "depends_on": [
             "M2"
           ]
