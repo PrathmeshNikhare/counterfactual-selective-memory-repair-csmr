@@ -63,14 +63,20 @@ Decide in two steps.
      stored memory is not the reference answer. E.g. stored memory "The user's book club meets on the first Monday of
      each month", new fact "The user switched to a new phone carrier", answer "The book club meets on Mondays, roughly
      once a month." -> consistent (the new fact says nothing about the book club).
-   - "consistent" (1.0): the answer is correct given the new fact. If determined_by_change is false, "unknown" or an
-     uncertain answer is consistent.
+   - "unsupported" (0.5): the answer does not contradict anything, but asserts as definite a consequence of the new
+     fact that the new fact does NOT establish (an over-claim). E.g. stored memory "The user buys fish food every
+     month", new fact "The user gave their goldfish to a neighbour", answer "The user no longer buys any pet
+     supplies." -> unsupported (they may have other pets; "unknown" or "probably not fish food any more" would be
+     consistent).
+   - "consistent" (1.0): the answer is correct given the new fact, or appropriately uncertain where the new fact
+     leaves it open. If determined_by_change is false, "unknown" or an uncertain answer is consistent.
    - "vague" (0.5): determined_by_change is true but the answer is "unknown" or vague.
-Return JSON only: {{"determined_by_change": true | false, "verdict": "consistent" | "vague" | "contradicts"}}"""
+Return JSON only: {{"determined_by_change": true | false,
+"verdict": "consistent" | "unsupported" | "vague" | "contradicts"}}"""
 RETRY_NUDGE = "\nReturn exactly the JSON object described above."  # changes the prompt so the disk cache is not hit again
 PROBE_FALLBACK = "What is the current state of this: {text}?"
 
-VERDICT_SCORE = {"consistent": 1.0, "vague": 0.5, "contradicts": 0.0}
+VERDICT_SCORE = {"consistent": 1.0, "unsupported": 0.5, "vague": 0.5, "contradicts": 0.0}
 
 
 def _presupposes(q: str, obs: Observation, cands: dict[str, CandidateInfo], store: MemoryStoreAdapter) -> bool:

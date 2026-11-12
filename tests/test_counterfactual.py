@@ -83,6 +83,7 @@ def test_minimality_ablation_zeroes_penalties(monkeypatch):
     (True, "vague", 0.5),         # change determines the answer but the answer is "unknown"/vague
     (True, "contradicts", 0.0),   # asserts what the change contradicts
     (True, "consistent", 1.0),
+    (False, "unsupported", 0.5),  # over-claim: a definite consequence the change does not establish
 ])
 def test_judge_rubric_cases(monkeypatch, determined, verdict, expected):
     sc = load_scenario("data/dev/car_sale.json")
@@ -95,9 +96,11 @@ def test_judge_rubric_cases(monkeypatch, determined, verdict, expected):
     monkeypatch.setattr(llm, "call", stub)
     out = cf.judge("a", "q", DELTA, sc.observation, CFG)
     assert out == {"determined_by_change": determined, "verdict": verdict, "score": expected}
-    for phrase in ("determined_by_change", '"unknown" or an\n     uncertain answer is consistent',
-                   "is true but the answer is", "asserts something the new fact contradicts"):
-        assert phrase in seen["prompt"]
+    prompt = " ".join(seen["prompt"].split())  # rubric wording, independent of line wrapping
+    for phrase in ("determined_by_change", '"unknown" or an uncertain answer is consistent',
+                   "is true but the answer is", "asserts something the new fact contradicts",
+                   '"unsupported" (0.5)'):
+        assert phrase in prompt
 
 
 def test_select_rows_carry_judge_fields(monkeypatch):
@@ -568,6 +571,31 @@ def _scope_aware_judge(p, **k):
     is not a contradiction. Without the rule it reproduces the real-LLM M12 false positive."""
     scope_rule = "merely differs from the stored memory" in p and "is NOT \"contradicts\" when the new fact does" in p
     return {"determined_by_change": False, "verdict": "consistent" if scope_rule else "contradicts"}
+
+
+def _overclaim_aware_judge(p, **k):
+    """Stub judge following the prompt's over-claim rule (verdict "unsupported" exists and is defined)."""
+    rule = '"unsupported" (0.5)' in p and "does NOT establish (an over-claim)" in p
+    return {"determined_by_change": False, "verdict": "unsupported" if rule else "consistent"}
+
+
+def test_judge_over_claim_is_unsupported_half_credit(monkeypatch):
+    # real run on car_sale_distractors, R2: "no longer spends money on fuel" after selling one car was scored 1.0
+    sc = load_scenario("data/dev/car_sale.json")
+    seen = []
+    monkeypatch.setattr(llm, "call", lambda p, **k: seen.append(p) or _overclaim_aware_judge(p))
+    out = cf.judge("The user no longer spends money on fuel.", "What type of fuel does the user spend money on?",
+                   DELTA, sc.observation, CFG, "The user spends money on fuel.")
+    assert out == {"determined_by_change": False, "verdict": "unsupported", "score": 0.5}
+    assert "goldfish" in seen[0] and "fuel" not in _rubric(seen[0])  # example unrelated to any scenario
+    # an appropriately uncertain answer is still decided in code, not by the LLM verdict
+    monkeypatch.setattr(llm, "call", lambda p, **k: {"determined_by_change": False, "verdict": "unsupported"})
+    assert cf.judge("unknown", "q", DELTA, sc.observation, CFG)["score"] == 1.0
+
+
+def _rubric(prompt: str) -> str:
+    """The rubric part of a judge prompt (everything after the question/answer block)."""
+    return prompt.split("Decide in two steps.", 1)[1]
 
 
 def test_judge_answer_differing_from_unaffected_memory_is_not_a_contradiction(monkeypatch):

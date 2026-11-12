@@ -187,7 +187,11 @@ def generate_probes(delta, obs, cands, store, n: int, cfg=None) -> tuple[list[di
 # Probes are open questions (what/which/where/how/who): LLM probes starting with a yes/no word (cfg.probe_yes_no_starts) or containing a change-hinting word (cfg.probe_banned_patterns: "still", "anymore", "no longer", ...) are dropped. If no LLM probe survives, the template fallback probes (below) are used and a "probes" fallback is recorded.
 def judge(answer: str, question: str, delta, obs, cfg, source_text: str = "") -> dict       # ONE call, two explicit steps:
 # The prompt shows the probe's source memory (source_text). If the answer still asserts the part of that memory the change makes false or likely outdated, the verdict is "contradicts" even when the answer omits the specific detail (prompt example uses wording unrelated to any scenario).
-# {"determined_by_change": bool, "verdict": "consistent"|"vague"|"contradicts"} -> score 1.0 / 0.5 / 0.0
+# {"determined_by_change": bool, "verdict": "consistent"|"unsupported"|"vague"|"contradicts"} -> score 1.0 / 0.5 / 0.5 / 0.0
+#   consistent (1.0): correct given the change, or appropriately uncertain where the change leaves it open.
+#   unsupported (0.5): contradicts nothing, but asserts as definite a consequence the change does NOT establish (an
+#     over-claim: "The user no longer spends money on fuel." after selling one car; prompt example: no pet supplies at
+#     all after giving away a goldfish). Without it, a repair that over-claims scored as well as a correct one.
 #   determined_by_change=false: "unknown"/uncertain answers are consistent (1.0)
 #   determined_by_change=true:  "unknown"/vague is vague (0.5)
 #   Only claims about the CURRENT state can contradict: mentioning an old value explicitly as past/previous ("used Alembic before; current method unknown") is NOT asserting it.

@@ -124,7 +124,7 @@ $$
 R^\* = \arg\max_{R}\;\; \text{Benefit}(R) \;-\; \lambda_c\,\text{Collateral}(R) \;-\; \lambda_e\,\text{EvidenceCost}(R) \;-\; \lambda_s\,|R|
 $$
 
-- **Benefit** — mean judge score of the agent's answers to probe questions under *R* (consistent = 1, vague = 0.5, contradicted by the change = 0).
+- **Benefit** — mean judge score of the agent's answers to probe questions under *R* (consistent = 1, vague or unsupported over-claim = 0.5, contradicted by the change = 0).
 - **Collateral** — Σ (1 − P_dep) over memories *R* revises or revokes: the risk of damaging memories that don't actually depend on the change.
 - **EvidenceCost** — the cost of verification requests and extra model calls.
 - **|R|** — number of non-KEEP actions (minimality).
