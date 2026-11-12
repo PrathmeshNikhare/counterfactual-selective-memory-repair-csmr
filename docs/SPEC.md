@@ -259,13 +259,19 @@ Ablation flags (`config.yaml: ablation`):
 
 ## 13. Baselines (`baselines/`)
 
-Each: `def run(obs, store, cfg) -> dict[str, Action]` + revised texts. Same agent, same inputs. Every baseline's final view includes the same appended observation memory (`observation_memory`); only repair actions differ.
-- `append_only`: store observation as new memory, change nothing. Since the shared agent shows dates and resolves conflicts by recency (§9), this is also the recency baseline; there is no separate `recency` method.
-- `last_write_wins`: REVISE/REVOKE memories with same entity+attribute as Δ only.
-- `similarity_prop`: REVISE every memory with cosine(obs, m) ≥ cfg.sim_prop_threshold.
-- `dependency_only`: CSMR Phase A–C, modify every candidate with P ≥ τd (ignore evidence, no counterfactual).
-- `evidence_only`: modify every candidate with S ≥ τe (ignore dependency).
-- `llm_oneshot`: give LLM all memories + observation, ask for an action per memory in JSON.
+Each module: `run(obs, store, cfg=None) -> Trace`, the same signature and output as `run_pipeline` (§12); `baselines.BASELINES` maps name → run. All go through one harness (`baselines/common.py: run_baseline(name, decide, ...)`), so only the repair rule `decide` differs:
+1. Phase A exactly as CSMR (`pipeline/run.py: phase_a` → Δ, note, roots). No state change → nothing stored, empty `final_actions` (as `run_pipeline`).
+2. `decide(delta, obs, roots, store, cfg) -> (actions, C)`; memories it leaves out are KEEP. "Modify" = REVOKE for a root whose fact is removed (`change_type == "remove"`), else REVISE (`modify_action`, the same root rule as §6).
+3. REVISE texts / CONDITIONAL conditions from CSMR's helpers (`counterfactual.prepare_texts`); the versioned `commit` (§11) with the same appended observation memory (`observation_memory`, same id/text/time as CSMR's). The shared agent (§9) answers from this committed store at evaluation time.
+4. Trace: `delta`, `note`, `roots`, `candidates` (only for methods with a candidate stage; `{}` otherwise), `final_actions`, `transitions`, `chosen` = the baseline name, `llm_stats`, `wall_time_s`. No probes, repair sets or validation.
+
+- `append_only`: change nothing. Since the shared agent shows dates and resolves conflicts by recency (§9), this is also the recency baseline; there is no separate `recency` method.
+- `last_write_wins`: modify the memories with the same entity (case-insensitive) AND attribute as Δ, all treated as roots.
+- `similarity_prop`: REVISE (never REVOKE) every memory with cosine(embed(obs.text), embed(m.text)) ≥ cfg.sim_prop_threshold.
+- `dependency_only`: CSMR Phases A–C (`phase_bc`) with `ablation.use_evidence = false` (S = 1, rule 7), then modify every candidate with P_dep ≥ τd. No counterfactual.
+- `evidence_only`: CSMR Phases A–C with `ablation.use_dependency = false` (P_dep = 1, no causal-cue LLM calls), then modify every candidate with S ≥ τe. No counterfactual.
+- `llm_oneshot`: ONE JSON call through `csmr/llm.py` (`ONESHOT_PROMPT`: the five actions defined as in Paper IV-F, the observation with date/source, every active memory as `id [date]: text`) → `{"actions": {id: action}}`; unknown ids ignored, missing ids KEEP, `cfg.oneshot_max_tokens`. Malformed (not a dict of valid action names) → retried once (`try_json_valid`), then all KEEP and an `llm_oneshot` fallback in `llm_stats`.
+- Metrics (§14): `candidates` is `{}` for append_only, last_write_wins, similarity_prop and llm_oneshot, so `candidate_recall` is 0 and dependent precision undefined / recall 0 for them; `evidence_only` has P_dep = 1 for every candidate. Report the dependency and candidate columns only for methods with a dependency stage (CSMR, dependency_only).
 
 ## 14. Evaluation (`eval/`) — Paper VIII
 

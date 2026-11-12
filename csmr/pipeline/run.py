@@ -15,7 +15,32 @@ from csmr.pipeline.commit import commit, validate
 from csmr.pipeline.extract import extract, find_roots
 from csmr.pipeline.overlay import observation_memory
 from csmr.pipeline.repair_sets import generate_repair_sets
-from csmr.types import Action, Observation, Trace
+from csmr.types import Action, CandidateInfo, Observation, StateChange, Trace
+
+
+def phase_a(obs: Observation, store: MemoryStoreAdapter, cfg: dict
+            ) -> tuple[StateChange | None, dict | None, list[str]]:
+    """Paper IV-A: (Δ, note, roots); roots are [] when there is no state change. Shared with the baselines."""
+    related = [m.text for m in store.search(obs.text, cfg["extract_context_k"])]
+    delta, note = extract(obs, [m.attribute for m in store.all()], cfg, related=related,
+                          known_entities=[m.entity for m in store.all()])
+    return delta, note, find_roots(delta, obs, store, cfg) if delta else []
+
+
+def phase_bc(delta: StateChange, obs: Observation, roots: list[str], store: MemoryStoreAdapter,
+             cfg: dict) -> dict[str, CandidateInfo]:
+    """Paper IV-B, IV-C: candidate set C with P_dep, S and the proposed action. Shared with the baselines."""
+    cands = build_candidates(delta, obs, roots, store, cfg)
+    dependency.assess_dependency(cands, store, delta, obs, cfg)
+    evidence.assess_evidence(cands, store, delta, obs, cfg)
+    for mid, info in cands.items():
+        info.proposed = propose_action(mid, info, cfg, delta.change_type)
+    return cands
+
+
+def candidates_dict(cands: dict[str, CandidateInfo]) -> dict[str, dict]:
+    """Trace form of C."""
+    return {m: {**asdict(i), "proposed": i.proposed.value} for m, i in cands.items()}
 
 
 def run_pipeline(obs: Observation, store: MemoryStoreAdapter, cfg: dict | None = None) -> Trace:
@@ -31,20 +56,13 @@ def run_pipeline(obs: Observation, store: MemoryStoreAdapter, cfg: dict | None =
         return trace
 
     # A
-    related = [m.text for m in store.search(obs.text, cfg["extract_context_k"])]
-    delta, trace.note = extract(obs, [m.attribute for m in store.all()], cfg, related=related,
-                                known_entities=[m.entity for m in store.all()])
+    delta, trace.note, trace.roots = phase_a(obs, store, cfg)
     if delta is None:
         return finish()
     trace.delta = asdict(delta)
-    trace.roots = find_roots(delta, obs, store, cfg)
     # B, C
-    cands = build_candidates(delta, obs, trace.roots, store, cfg)
-    dependency.assess_dependency(cands, store, delta, obs, cfg)
-    evidence.assess_evidence(cands, store, delta, obs, cfg)
-    for mid, info in cands.items():
-        info.proposed = propose_action(mid, info, cfg, delta.change_type)
-    trace.candidates = {m: {**asdict(i), "proposed": i.proposed.value} for m, i in cands.items()}
+    cands = phase_bc(delta, obs, trace.roots, store, cfg)
+    trace.candidates = candidates_dict(cands)
     # D
     sets = generate_repair_sets(cands, {m: i.proposed for m, i in cands.items()}, cfg)
     new_mem = observation_memory(delta, obs, store)
