@@ -78,6 +78,33 @@ def test_quota_stops_shard_cleanly(env, monkeypatch):
     assert not (tmp / "raw/t/errors.jsonl").exists()
 
 
+def test_overlay_is_hashed_recorded_and_not_merged(env, tmp_path):
+    calls, tmp = env
+    ov = tmp_path / "tuned.yaml"
+    ov.write_text(f"tau_d: {CFG['tau_d']}\n")  # same value as config.yaml: still a different run
+    ov2 = tmp_path / "tuned2.yaml"
+    ov2.write_text(f"# only a comment differs\ntau_d: {CFG['tau_d']}\n")
+    h0 = run_all.config_hash(CFG)
+    assert run_all.config_hash(CFG, str(ov)) != h0
+    assert run_all.config_hash(CFG, str(ov2)) == run_all.config_hash(CFG, str(ov))  # parsed content, not bytes
+    run_all.run("dev", ["a"], "t", "1/1", CFG, [])
+    run_all.run("dev", ["b"], "t", "1/1", load_config(overlay=str(ov)), [], str(ov))
+    rec = json.loads(next((tmp / "raw/t/dev/b").glob("*.json")).read_text())
+    assert rec["config_overlay"] == str(ov) and rec["config_hash"] == run_all.config_hash(CFG, str(ov))
+    with pytest.raises(SystemExit, match="config_hash"):
+        aggregate.main(["--tag", "t", "--split", "dev"])
+
+
+def test_main_passes_overlay(env, tmp_path, monkeypatch):
+    ov = tmp_path / "tuned.yaml"
+    ov.write_text("lambda_c: 0.25\n")
+    got = []
+    monkeypatch.setattr(run_all, "run", lambda *a: got.append(a) or 0)
+    run_all.main(["--split", "dev", "--methods", "a", "--config-overlay", str(ov), "--set", "tau_e=0.7"])
+    split, methods, tag, shard, cfg, overrides, overlay = got[0]
+    assert cfg["lambda_c"] == 0.25 and cfg["tau_e"] == 0.7 and overlay == str(ov) and overrides == ["tau_e=0.7"]
+
+
 def test_aggregate_writes_tables_and_refuses_hash_mismatch(env):
     calls, tmp = env
     _go()
