@@ -47,7 +47,9 @@ def shard(paths: list[Path], spec: str) -> list[Path]:
 
 
 def config_hash(cfg: dict) -> str:
-    """Effective config plus any fitted weights (models/*.json are gitignored, so the commit does not cover them)."""
+    """Effective config plus any fitted weights (models/*.json are gitignored, so the commit does not cover them).
+    The `fit` block (tuning grids) is left out: it changes no run, and editing it must not invalidate val traces."""
+    cfg = {k: v for k, v in cfg.items() if k != "fit"}
     h = hashlib.sha256(json.dumps(cfg, sort_keys=True, default=str).encode())
     for p in sorted((ROOT / "models").glob("*.json")):
         h.update(p.name.encode() + p.read_bytes())

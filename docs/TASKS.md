@@ -41,7 +41,7 @@ Integration fixture for everything: `data/dev/car_sale.json`.
 ## Phase 2 — after dataset exists (see docs/DATASET_NOTE.md)
 - [x] **E1 `baselines/`** — 7 baselines per SPEC §13 (no separate recency baseline: the shared agent is recency-aware; TEPA / STALE/CUPMem not reimplemented, see §13).
 - [x] **E2 `eval/metrics.py`** — all metrics per SPEC §14.
-- [ ] **E3** `fit_dependency` / `fit_evidence` on train split; tune τd, τe, λ on val.
+- [ ] **E3** `fit_dependency` / `fit_evidence` on train split; tune τd, τe, λ on val. Tooling done (`eval/fit.py train | val | tune`, SPEC §14); tick after running it on the generated dataset.
 - [x] **E4 `eval/run_all.py`** → results/raw/<tag>/<split>/<method>/<id>.json; `eval/aggregate.py` → results/<tag>/<split>/{main,per_category,persistence,cost}.csv + summary.md.
 - [ ] **E5 `eval/ablations.py`**, `eval/plots.py` (λc sweep).
 - [ ] **E6** error analysis: sample 20 failures, tag with paper's 6 error categories → results/errors.csv.

@@ -116,6 +116,14 @@ sim_prop_threshold: 0.4
 graph_prop_hops: 1         # graph_propagation: change everything within this many hops of the root (--set graph_prop_hops=2)
 oneshot_max_tokens: 4096   # llm_oneshot: one action per memory for 30-40 memories, reasoning model
 
+# Fitting / tuning (eval/fit.py, TASKS E3). Each <key>_grid is searched for <key> on val; the product is the grid.
+fit:
+  tau_d_grid: [0.3, 0.4, 0.5, 0.6, 0.7]
+  tau_e_grid: [0.3, 0.4, 0.5, 0.6, 0.7]
+  lambda_c_grid: [0.1, 0.25, 0.5]
+  lambda_s_grid: [0, 0.01, 0.02, 0.05]
+  lambda_e_grid: [0, 0.05, 0.1]
+
 # Evaluation (SPEC §14)
 bootstrap_samples: 2000   # scenario-level resamples for the confidence intervals (rng = seed)
 ci_level: 0.95
