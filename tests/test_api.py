@@ -7,6 +7,7 @@ from csmr.pipeline import commit as commit_mod
 from csmr.pipeline import counterfactual as cf
 from csmr.pipeline.agent import answer
 from csmr.scenario import load_scenario
+from eval.metrics import qa_judge
 from tests.test_run import _fake_judge, _llm
 
 
@@ -41,8 +42,10 @@ def test_observe_defaults_time(monkeypatch):
 def test_chat_flow_gives_non_car_answer():
     api = CSMR(InMemoryAdapter(load_scenario("data/dev/car_sale.json").memories))
     api.observe("I sold my car.")
-    out = answer("how do I get to work?", api.retrieve_memories("how do I get to work?"), cfg=api.cfg).lower()
-    assert "drive" not in out and "car" not in out.replace("no car", "").replace("sold", "")
+    q = "how do I get to work?"
+    out = answer(q, api.retrieve_memories(q), cfg=api.cfg)
+    gold = "Not by their own car; the user sold it (current commute method unknown)."
+    assert qa_judge(q, gold, out, api.cfg), out
 
 
 def test_non_question_without_state_change_is_stored_and_questions_are_ignored(monkeypatch):
