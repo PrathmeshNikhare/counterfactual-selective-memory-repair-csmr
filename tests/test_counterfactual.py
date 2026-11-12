@@ -220,7 +220,7 @@ def test_observation_memory_in_every_view(monkeypatch):
 
 
 @pytest.mark.llm
-def test_car_real_llm_prefers_r2():
+def test_car_real_llm_selects_best_feasible_set():
     from csmr.pipeline import actions
     sc = load_scenario("data/dev/car_sale.json")
     store = InMemoryAdapter(sc.memories)
@@ -233,7 +233,10 @@ def test_car_real_llm_prefers_r2():
     best, rows = cf.select(sets, probes, store, revised, conds, cands, DELTA, sc.observation, CFG,
                            observation_memory(DELTA, sc.observation, store))
     print(probes, rows)
-    assert best.name in ("R1", "R2")
+    # Table II proposals in, selection rule out. WHICH set wins depends on the agent's answers and is not pinned.
+    assert {m: a.value for m, a in prop.items()} == {"M1": "REVOKE", "M2": "REVISE", "M3": "VERIFY", "M4": "KEEP"}
+    totals = [r["score"]["total"] for r in rows if r["feasible"]]
+    assert best.feasible and best.score["total"] >= max(totals) - CFG["tie_eps"]
 
 
 @pytest.mark.parametrize("ans", ["unknown", "I'm not sure.", "Cannot determine that.", "It is uncertain whether so.", ""])

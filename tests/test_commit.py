@@ -26,6 +26,13 @@ def test_commit_versions_history_and_pending():
     assert store.get("M3").status == "pending_verify" and store.get("M4").condition == "owns a car"
     assert store.get("M5").version == 1
     assert len(store.all(include_revoked=True)) == n + 1 and len(tr) == 5
+    # REVISE (M2) / CONDITIONAL (M4) are re-dated to the observation; their original date stays in history
+    assert store.get("M2").time == store.get("M4").time == obs.time
+    assert store.get("M2").history[0]["time"] == "2026-03-05T09:00:00"
+    assert store.get("M4").history[0]["time"] == "2026-04-10T12:00:00"
+    # REVOKE (M1), VERIFY (M3) and untouched memories keep their date
+    assert (m1.time, store.get("M3").time, store.get("M5").time) == (
+        "2026-03-01T10:00:00", "2026-04-02T18:00:00", "2026-02-14T20:00:00")
 
 
 def test_validate_warns_on_mismatch(monkeypatch):
@@ -44,10 +51,11 @@ def test_committed_render_matches_overlay_view():
     store, delta, obs = _setup()
     rs = RepairSet("R2", {"M1": Action.REVOKE, "M2": Action.REVISE, "M3": Action.VERIFY, "M4": Action.CONDITIONAL})
     nm = observation_memory(delta, obs, store)
-    virtual = [(m.id, m.text) for m in view(store, rs, {"M2": "new"}, {"M4": "owns a car"}, nm)]
+    virtual = [(m.id, m.text, m.time) for m in view(store, rs, {"M2": "new"}, {"M4": "owns a car"}, nm)]
     C.commit(store, rs, {"M2": "new"}, {"M4": "owns a car"}, nm)
-    assert [(r.id, r.text) for m in store.all(include_revoked=True) if (r := render(m))] == virtual
-    assert any(t.startswith("[unverified] ") for _, t in virtual) and any("(only valid if: " in t for _, t in virtual)
+    assert [(r.id, r.text, r.time) for m in store.all(include_revoked=True) if (r := render(m))] == virtual
+    assert {i: t for i, _, t in virtual}["M2"] == obs.time  # the agent sees the same (re-dated) memories either way
+    assert any(t.startswith("[unverified] ") for _, t, _ in virtual) and any("(only valid if: " in t for _, t, _ in virtual)
 
 
 @pytest.mark.llm

@@ -35,16 +35,20 @@ def render(m: Memory) -> Memory | None:
 
 
 _ACTION_STATUS = {Action.REVOKE: "revoked", Action.VERIFY: "pending_verify", Action.CONDITIONAL: "conditional"}
+# Their content is rewritten at the commit, so they take the observation's date (view and commit must agree).
+REDATED_ACTIONS = {Action.REVISE, Action.CONDITIONAL}
 
 
 def view(store: MemoryStoreAdapter, rs: RepairSet, revised: dict[str, str],
          conditions: dict[str, str], new_mem: Memory | None = None) -> list[Memory]:
+    """new_mem (the observation memory) also carries the commit time used to re-date REVISE / CONDITIONAL."""
     out = []
     for m in store.all():
         a = rs.actions.get(m.id, Action.KEEP)
         virtual = dataclasses.replace(
             m, text=revised[m.id] if a == Action.REVISE else m.text, status=_ACTION_STATUS.get(a, m.status),
-            condition=conditions[m.id] if a == Action.CONDITIONAL else m.condition)
+            condition=conditions[m.id] if a == Action.CONDITIONAL else m.condition,
+            time=new_mem.time if new_mem and a in REDATED_ACTIONS else m.time)
         if (r := render(virtual)) is not None:
             out.append(r)
     return out + [render(new_mem)] if new_mem else out

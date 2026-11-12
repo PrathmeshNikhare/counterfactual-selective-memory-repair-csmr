@@ -7,7 +7,7 @@ from csmr.adapters.base import MemoryStoreAdapter
 from csmr.config import load_config
 from csmr.pipeline.agent import answer
 from csmr.pipeline.counterfactual import judge
-from csmr.pipeline.overlay import render
+from csmr.pipeline.overlay import REDATED_ACTIONS, render
 from csmr.types import Action, Memory, Observation, StateChange
 
 _STATUS = {Action.REVOKE: "revoked", Action.VERIFY: "pending_verify", Action.CONDITIONAL: "conditional"}
@@ -17,7 +17,8 @@ def commit(store: MemoryStoreAdapter, rs, revised: dict[str, str], conditions: d
            new_mem: Memory) -> list[dict]:
     """Apply rs to the store (every change pushes history, bumps version) and add the observation memory.
     Returns version transitions. Pending-verify queue = memories with status "pending_verify".
-    A REVISE resets the memory to active and clears any condition."""
+    A REVISE resets the memory to active and clears any condition.
+    REVISE / CONDITIONAL take the observation's time (new_mem.time); the original date stays in history."""
     if not rs.feasible:
         raise ValueError(f"cannot commit infeasible repair set {rs.name}: {rs.infeasible_reason}")
     transitions = []
@@ -29,7 +30,7 @@ def commit(store: MemoryStoreAdapter, rs, revised: dict[str, str], conditions: d
         revise = a == Action.REVISE
         m = store.update(mid, text=revised[mid] if revise else None, status="active" if revise else _STATUS[a],
                          condition=conditions[mid] if a == Action.CONDITIONAL else None, clear_condition=revise,
-                         reason=f"{rs.name}:{a.value}")
+                         time=new_mem.time if a in REDATED_ACTIONS else None, reason=f"{rs.name}:{a.value}")
         transitions.append({"id": mid, "action": a.value, "from_version": old_version, "to_version": m.version,
                             "from_status": old_status, "to_status": m.status})
     store.add(new_mem)

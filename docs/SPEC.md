@@ -31,7 +31,7 @@ Lazy singletons:
 
 ### 1.4 Store adapters
 `csmr/adapters/base.py` (written) defines `MemoryStoreAdapter`.
-`csmr/adapters/memory.py`: `InMemoryAdapter(memories: list[Memory])`, `from_json(path)`, `to_json(path)`, `snapshot() -> InMemoryAdapter` (deep copy). `update()` MUST push previous version to `history` and bump `version`.
+`csmr/adapters/memory.py`: `InMemoryAdapter(memories: list[Memory])`, `from_json(path)`, `to_json(path)`, `snapshot() -> InMemoryAdapter` (deep copy). `update()` MUST push previous version to `history` and bump `version`. `update(..., time=...)` sets a new date (used by the commit for REVISE / CONDITIONAL, §11).
 
 ### 1.5 Scenario loader (`csmr/scenario.py`)
 `load_scenario(path) -> Scenario` with `memories: list[Memory]`, `observation: Observation`, and a separate `gold: GoldLabels | None` (`actions`, `dependencies`, `eval_questions`, optional `persistence_memories: list[Memory]`). **Pipeline functions never receive `gold`.**
@@ -154,13 +154,14 @@ def observation_memory(delta, obs, store) -> Memory
 ```
 The new observation is itself a memory (`observation_memory`: text = delta.statement, entity/attribute from Δ, source/time from the observation, id `OBS<n>`) and is appended to EVERY view, R0 included. Repair actions apply only to existing memories.
 Per memory: REVOKE → excluded; REVISE → text replaced; VERIFY → text prefixed "[unverified] "; CONDITIONAL → "{text} (only valid if: {condition})"; else unchanged. Never mutates the store.
+REVISE and CONDITIONAL (`REDATED_ACTIONS`) also set the memory's `time` to the observation's time (`new_mem.time`), exactly as the commit does (§11), so the agent sees the same dates during selection and after the commit. VERIFY and KEEP keep their original date.
 
 ## 9. Downstream agent (`pipeline/agent.py`)
 
 ```python
-def answer(question: str, memories: list[Memory], k: int = 5, cfg=None, extra_instruction: str = "") -> str
+def answer(question: str, memories: list[Memory], k: int = 5, cfg=None) -> str
 ```
-Retrieve top-k by cosine to the question from the given memory list; LLM answers using ONLY those memories. Each retrieved memory is shown with the date it was recorded, `- [YYYY-MM-DD] <text>` (`memory.time[:10]`; "undated" if empty). Instructions: if memories conflict, rely on the most recent one; answer exactly "unknown" only when no retrieved memory addresses the question. This is identical for every method (CSMR selection and validation, baselines, eval). The one permitted difference is `extra_instruction`, a sentence appended to the instruction block (used only by the `recency` baseline, §13): with it, the prompt differs from the shared prompt by that sentence and nothing else. An empty LLM answer is retried once (changed prompt, double max tokens), then replaced by "unknown"; an empty answer never reaches the judge. Memories rendered with an `[unverified]` prefix (VERIFY) are flagged in the prompt ("Memories marked [unverified] may be outdated; mention the uncertainty."), so the agent surfaces the uncertainty instead of asserting the stale fact. Same agent is used by all baselines and by eval.
+Retrieve top-k by cosine to the question from the given memory list; LLM answers using ONLY those memories. Each retrieved memory is shown with the date it was recorded, `- [YYYY-MM-DD] <text>` (`memory.time[:10]`; "undated" if empty). Instructions: if memories conflict, rely on the most recent one; answer exactly "unknown" only when no retrieved memory addresses the question. This is identical for every method (CSMR selection and validation, baselines, eval); no method may change the prompt. The date is `Memory.time`; a REVISE'd or CONDITIONAL memory carries the date of the observation that changed it (§8, §11). An empty LLM answer is retried once (changed prompt, double max tokens), then replaced by "unknown"; an empty answer never reaches the judge. Memories rendered with an `[unverified]` prefix (VERIFY) are flagged in the prompt ("Memories marked [unverified] may be outdated; mention the uncertainty."), so the agent surfaces the uncertainty instead of asserting the stale fact. Same agent is used by all baselines and by eval.
 
 ## 10. Counterfactual selection (`pipeline/counterfactual.py`) — Paper IV-D, V
 
@@ -200,7 +201,7 @@ EvidenceCost  = (#VERIFY actions in rs) * cfg.verify_cost + llm_calls_for_rs * c
 |R|           = number of non-KEEP actions
 ```
 - argmax over feasible sets; ties → smaller |R|.
-- Cache answers by (question, source_text, hash of view) — identical views reuse results.
+- Cache answers by (question, source_text, hash of view) — identical views reuse results. The view hash covers each memory's id, date and text (everything the agent sees).
 - Commit validation re-judges each probe with the same pre-commit source_text.
 - Malformed LLM JSON never crashes a run; each fallback is counted in `Trace.llm_stats["fallbacks"]` (`llm.fallback(kind)`): extract (missing/invalid keys) → no state change; probes (missing/invalid) → one template probe per candidate, "What is the current state of this: <memory text>?" (built from memory text only, so never filtered); judge → retried once with a changed prompt, then verdict "vague" (0.5), `determined_by_change` null.; causal cue (dependency) → retried once, then "no"; REVISE text → retried once, then template "Previously: <text>. Possibly outdated after: <statement>"; CONDITIONAL condition → retried once, then "it is not affected by: <statement>" (kinds `causal_cue`, `revise_text`, `condition_text`).
 - Ties: totals within `cfg.tie_eps` are tied → smaller |R|. Token budgets: `cfg.probe_max_tokens`, `cfg.judge_max_tokens`.
@@ -216,6 +217,7 @@ def validate(store, probes, delta, obs, expected_benefit) -> dict
 - The observation memory (`observation_memory`) is added to the store in the same commit (version 1, status active).
 - `commit` raises ValueError if `rs.feasible` is False.
 - REVISE → update text, set status "active" and clear any condition (via `update(..., clear_condition=True)`); REVOKE → status "revoked"; VERIFY → status "pending_verify", add to pending queue; CONDITIONAL → status "conditional", store condition; all push history.
+- REVISE and CONDITIONAL also set `time` to the observation's time (`update(..., time=new_mem.time)`); the previous version, with its original date, is the history entry. REVOKE and VERIFY keep their date.
 - Validation re-runs probes on committed store; warn if |benefit − expected| > 0.01.
 
 ## 12. Orchestrator + public API (`pipeline/run.py`, `csmr/api.py`)
@@ -242,8 +244,7 @@ Ablation flags (`config.yaml: ablation`):
 ## 13. Baselines (`baselines/`)
 
 Each: `def run(obs, store, cfg) -> dict[str, Action]` + revised texts. Same agent, same inputs. Every baseline's final view includes the same appended observation memory (`observation_memory`); only repair actions differ.
-- `append_only`: store observation as new memory, change nothing.
-- `recency`: append; agent instructed to prefer most recent memory, passed as `answer(..., extra_instruction=...)` so its prompt differs from the shared one (which already shows dates, §9) only in that sentence.
+- `append_only`: store observation as new memory, change nothing. Since the shared agent shows dates and resolves conflicts by recency (§9), this is also the recency baseline; there is no separate `recency` method.
 - `last_write_wins`: REVISE/REVOKE memories with same entity+attribute as Δ only.
 - `similarity_prop`: REVISE every memory with cosine(obs, m) ≥ cfg.sim_prop_threshold.
 - `dependency_only`: CSMR Phase A–C, modify every candidate with P ≥ τd (ignore evidence, no counterfactual).

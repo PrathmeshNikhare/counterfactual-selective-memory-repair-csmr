@@ -24,9 +24,11 @@ class MemoryStoreAdapter(ABC):
 
     @abstractmethod
     def update(self, memory_id: str, *, text: Optional[str] = None, status: Optional[str] = None,
-               condition: Optional[str] = None, clear_condition: bool = False, reason: str = "") -> Memory:
+               condition: Optional[str] = None, clear_condition: bool = False, time: Optional[str] = None,
+               reason: str = "") -> Memory:
         """MUST push the previous version into history and increment version. Never delete.
-        clear_condition=True resets condition to None (mutually exclusive with `condition`)."""
+        clear_condition=True resets condition to None (mutually exclusive with `condition`).
+        time: new date of the memory (the previous one stays in the history entry)."""
 
     @abstractmethod
     def snapshot(self) -> "MemoryStoreAdapter":

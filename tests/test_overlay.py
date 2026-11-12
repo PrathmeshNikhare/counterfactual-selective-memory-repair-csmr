@@ -3,19 +3,24 @@ import copy
 from csmr.adapters.memory import InMemoryAdapter
 from csmr.pipeline.overlay import view
 from csmr.scenario import load_scenario
-from csmr.types import Action, RepairSet
+from csmr.types import Action, Memory, RepairSet
 
 
 def test_view_applies_actions_without_mutating_store():
     store = InMemoryAdapter(load_scenario("data/dev/car_sale.json").memories)
     before = copy.deepcopy(store.all(include_revoked=True))
     rs = RepairSet("R", {"M1": Action.REVOKE, "M2": Action.REVISE, "M3": Action.VERIFY, "M4": Action.CONDITIONAL})
-    out = {m.id: m.text for m in view(store, rs, {"M2": "revised"}, {"M4": "cond"})}
+    obs_mem = Memory("OBS6", "The user sold their car.", "user", "vehicle_ownership", "2026-06-01T11:00:00")
+    v = view(store, rs, {"M2": "revised"}, {"M4": "cond"}, obs_mem)
+    out = {m.id: m.text for m in v}
     assert "M1" not in out
     assert out["M2"] == "revised"
     assert out["M3"] == "[unverified] " + store.get("M3").text
     assert out["M4"] == store.get("M4").text + " (only valid if: cond)"
     assert out["M5"] == store.get("M5").text
+    # REVISE / CONDITIONAL are shown with the observation's date; VERIFY and KEEP keep their own
+    assert {m.id: m.time for m in v} == {"M2": obs_mem.time, "M3": "2026-04-02T18:00:00", "M4": obs_mem.time,
+                                         "M5": "2026-02-14T20:00:00", "OBS6": obs_mem.time}
     assert store.all(include_revoked=True) == before
 
 
@@ -54,16 +59,12 @@ def test_agent_retries_empty_then_unknown(monkeypatch):
     assert agent.answer("q?", []) == "Blue." and len(calls) == 2
 
 
-def test_agent_prompt_shows_dates_and_methods_differ_only_in_the_extra_instruction(monkeypatch):
+def test_agent_prompt_shows_dates_and_conflict_rule(monkeypatch):
     from csmr import llm
     from csmr.pipeline import agent
     calls = []
     monkeypatch.setattr(llm, "call", lambda p, **k: calls.append(p) or "x")
-    ms = load_scenario("data/dev/car_sale.json").memories[:2]
-    agent.answer("Does the user own a car?", ms)
-    agent.answer("Does the user own a car?", ms, extra_instruction="EXTRA RULE.")
-    shared, recency = calls
-    assert "- [2026-03-01] The user owns a car." in shared and "- [2026-03-05] The user drives to work by car." in shared
-    assert "If memories conflict, rely on the most recent one." in shared
-    assert 'Answer exactly "unknown" only when no memory below addresses the\nquestion.' in shared
-    assert recency.replace(" EXTRA RULE.", "") == shared and "EXTRA RULE." not in shared
+    agent.answer("Does the user own a car?", load_scenario("data/dev/car_sale.json").memories[:2])
+    assert "- [2026-03-01] The user owns a car." in calls[0] and "- [2026-03-05] The user drives to work by car." in calls[0]
+    assert "If memories conflict, rely on the most recent one." in calls[0]
+    assert 'Answer exactly "unknown" only when no memory below addresses the\nquestion.' in calls[0]

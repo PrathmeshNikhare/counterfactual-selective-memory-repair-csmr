@@ -201,7 +201,7 @@ def _evaluate(rs: RepairSet, probes: list[dict], store: MemoryStoreAdapter, revi
               conditions: dict[str, str], cands: dict[str, CandidateInfo], delta: StateChange, obs: Observation,
               cfg: dict, cache: dict, new_mem: Memory | None) -> tuple[dict[str, float], list[dict]]:
     mems = view(store, rs, revised, conditions, new_mem)
-    vhash = hashlib.sha256(json.dumps([(m.id, m.text) for m in mems]).encode()).hexdigest()
+    vhash = hashlib.sha256(json.dumps([(m.id, m.time, m.text) for m in mems]).encode()).hexdigest()  # what the agent sees
     details = []
     for p in probes:  # identical views reuse answers/judgements
         q, key = p["question"], (p["question"], p["source_text"], vhash)
