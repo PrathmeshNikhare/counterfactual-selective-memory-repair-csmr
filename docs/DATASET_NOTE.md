@@ -41,27 +41,37 @@ Gold `actions` follow these rules (they mirror the action rule in SPEC §6):
 - **CONDITIONAL** — memories affected by a *temporary* change.
 - **KEEP** — everything else.
 
-Two category conventions the seeds fix:
-- **weak_evidence**: root and its dependents are VERIFY (the rule above). `data/dev/bike_maybe.json` predates this and
-  keeps the dependents KEEP; the benchmark follows the rule.
+Conventions the seeds fix:
+- **Weak evidence** (weak_evidence, and the VERIFY families of conflicting_source): a memory is VERIFY **iff** it
+  would be REVOKE, REVISE or VERIFY if the change were confirmed; otherwise KEEP. So the root and every memory a
+  confirmed change would touch are VERIFY, and they are the ones in `gold.dependencies`. `data/dev/bike_maybe.json`
+  and `data/showcase/04` follow this.
 - **conflicting_source**: the more reliable source wins. A `third_party` observation contradicting a `user` memory →
-  root and dependents VERIFY. A `user` observation correcting an `inferred` / `third_party` memory → REVISE.
+  weak evidence (rule above). A `user` observation correcting an `inferred` / `third_party` memory → REVISE.
 - A dependent is REVISE only when the change makes it false (you can't drive a car you gave away). If it only
   removes the dependent's reason (a fuel budget, a parking pass), it is VERIFY.
+
+Gold answers:
+- **VERIFY memories** (weak evidence, and "reason removed" dependents): the current, old value. A hedge naming the
+  pending change is fine ("Two cats, Kesar and Elaichi (they might rehome one)"); asserting the change happened is
+  wrong.
+- **Changed memories whose new value is not stated**: say the old value no longer holds and the new one is not
+  stated, e.g. "Not stated; they no longer use Samsung Wallet since switching to a Pixel."
+- **CONDITIONAL memories**: the normal value plus the temporary exception and its end.
 
 ## Seeds and splits (`data/seeds/`)
 
 `seeds.json` holds 60 seed families, one per (category, domain) cell used: 7–8 per category, 6 per domain. A family
 gives the generator a change `pattern`, an example `observation`, `core_memories` (id, text, entity, attribute,
 source, `role` ∈ root | dependent | hard_negative, `gold_action`), `dependencies` (chains are written hop by hop:
-`[[M1, M2], [M2, M3]]`), `hard_negative_guidance` + `hard_negative_examples`, `persistence_guidance` +
-`persistence_examples`, and `eval_questions`. A generated scenario keeps the core memories (paraphrase allowed,
+`[[M1, M2], [M2, M3]]`), `hard_negative_guidance` + `hard_negative_examples`, `forbidden` (content the generator
+must not add as a hard negative or filler because the change would actually affect it), `persistence_guidance` +
+`persistence_examples`, and `eval_questions`. `docs/seed_review.md` lists the test families for human review. A generated scenario keeps the core memories (paraphrase allowed,
 labels unchanged), pads to 30–40 memories with ~10 hard negatives plus background, adds times, and records its seed
 in a top-level `"family"` field (`load_scenario` ignores it).
 
-`splits.json` assigns families before any generation (test 18 / val 6 / train 36, balanced by category and by
-domain), so all scenarios from one family stay in one split. With 8 categories, two categories
-(direct_contradiction, temporary_change) have no val family.
+`splits.json` assigns families before any generation (test 18 / val 8 / train 34; every category in val, counts
+per category and per domain differ by at most 1 within a split), so all scenarios from one family stay in one split.
 
 `python eval/validate_dataset.py` checks the seeds and every `data/generated/<split>/*.json` (schema, gold rules
 above, 30–40 memories, persistence dated after the observation, family/split match, near-duplicates within a

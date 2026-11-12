@@ -2,8 +2,8 @@
 
   python eval/validate_dataset.py [--seeds data/seeds] [--root data/generated]
 
-Seeds: schema, exactly one valid gold action per core memory, the labeling conventions, dependency / depends_on ids,
-balance over categories and domains (overall and per split), splits.json partitions the families.
+Seeds: schema (incl. a non-empty `forbidden` list), exactly one valid gold action per core memory, the labeling conventions, dependency / depends_on ids,
+balance over categories and domains (overall and per split), every category in every split, splits.json partitions the families.
 Scenarios (<root>/<split>/*.json): the same gold checks, plus the real loader accepts the file, 30-40 memories dated
 no later than the observation, 3-5 persistence memories dated after it, and the scenario's `family` sits in that
 split in splits.json. Near-duplicates (MiniLM cosine > dataset.near_dup_cosine): texts within one family/scenario,
@@ -38,7 +38,7 @@ ACTIONS = {a.value for a in Action}
 MEM_KEYS = {"id", "text", "entity", "attribute", "time", "source"}
 SEED_MEM_KEYS = {"id", "text", "entity", "attribute", "source", "role", "gold_action"}
 SEED_KEYS = {"family_id", "category", "domain", "pattern", "observation", "core_memories", "dependencies",
-             "hard_negative_guidance", "hard_negative_examples", "persistence_guidance", "persistence_examples",
+             "hard_negative_guidance", "hard_negative_examples", "forbidden", "persistence_guidance", "persistence_examples",
              "eval_questions"}
 SCENARIO_KEYS = {"id", "category", "domain", "family", "memories", "observation", "gold"}
 
@@ -102,6 +102,8 @@ def check_seeds(seed_dir: Path) -> tuple[list[str], list[dict], dict[str, str]]:
             e += [f"{w}: memory {m.get('id')} missing keys {sorted(SEED_MEM_KEYS - m.keys())}"] * bool(SEED_MEM_KEYS - m.keys())
             e += [f"{w}: memory {m.get('id')} has bad source/role"] * (m.get("source") not in SOURCES
                                                                          or m.get("role") not in ROLES)
+        e += [f"{w}: forbidden must be a non-empty list of strings"] * (
+            not f["forbidden"] or not all(isinstance(x, str) and x for x in f["forbidden"]))
         e += [f"{w}: observation needs text and source"] * (not {"text", "source"} <= f["observation"].keys())
         e += check_gold(w, f["category"], f["domain"], [m["id"] for m in mems],
                         {m["id"]: m.get("gold_action") for m in mems}, f["dependencies"], f["eval_questions"])
@@ -113,6 +115,8 @@ def check_seeds(seed_dir: Path) -> tuple[list[str], list[dict], dict[str, str]]:
     e += _balanced("seeds: categories", Counter(i["category"] for i in items), CATEGORIES)
     e += _balanced("seeds: domains", Counter(i["domain"] for i in items), DOMAINS)
     for s in splits:
+        e += [f"split {s}: missing categories {sorted(set(CATEGORIES) - {i['category'] for i in items if i['split'] == s})}"] * bool(
+            set(CATEGORIES) - {i["category"] for i in items if i["split"] == s})
         e += _balanced(f"split {s}: categories", Counter(i["category"] for i in items if i["split"] == s), CATEGORIES)
         e += _balanced(f"split {s}: domains", Counter(i["domain"] for i in items if i["split"] == s), DOMAINS)
     return e, items, split_of

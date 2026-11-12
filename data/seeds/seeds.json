@@ -55,6 +55,10 @@
         "The user once sold paint to a hotel chain as a summer intern.",
         "The user finds open-plan offices noisy."
       ],
+      "forbidden": [
+        "sales targets, client visits, commissions or anything else that rests on the sales role",
+        "the user's current team, manager or daily tasks (they changed with the move to marketing)"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the job domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user signed up for a weekend course on public speaking.",
@@ -136,6 +140,9 @@
       "hard_negative_examples": [
         "The user's school friends still meet at a café in Indore every Diwali.",
         "The user once looked at a flat in Bhopal in 2019 but did not take it."
+      ],
+      "forbidden": [
+        "the user's gym, commute, rent, neighbours, local shops or other routines tied to the Indore flat"
       ],
       "persistence_guidance": "3-5 later-turn memories in the residence domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
@@ -219,6 +226,9 @@
         "The user's flatmate keeps a dozen eggs in the shared fridge.",
         "The user learned to cook from their grandmother."
       ],
+      "forbidden": [
+        "eggs, dairy or other animal products the user eats or drinks (milky tea, curd, paneer, omelettes)"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the diet domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user tried a new millet recipe from a cooking channel.",
@@ -300,6 +310,10 @@
       "hard_negative_examples": [
         "Tanvi's parents live in Udaipur.",
         "The user's friend Kabir plays the tabla."
+      ],
+      "forbidden": [
+        "engagement or wedding plans (venue, date, guest list)",
+        "statements that the user and Tanvi are not yet married"
       ],
       "persistence_guidance": "3-5 later-turn memories in the relationship domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
@@ -383,6 +397,10 @@
         "The user's college is affiliated to Lucknow University.",
         "The user prefers handwritten notes."
       ],
+      "forbidden": [
+        "second-year courses, timetables, exams or fees",
+        "anything stating the user's year or semester"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the education domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user borrowed a book on taxation from a senior.",
@@ -465,6 +483,10 @@
         "The user's mother uses a Windows tablet for video calls.",
         "The user keeps their laptop on a cooling pad."
       ],
+      "forbidden": [
+        "Windows 10-specific software, settings or support dates on the laptop",
+        "anything stating the laptop's OS version"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the devices domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user bought a USB-C hub for their desk.",
@@ -546,6 +568,10 @@
       "hard_negative_examples": [
         "The user's salary is credited on the last working day of the month.",
         "The user gives Rs 5,000 a month to their parents."
+      ],
+      "forbidden": [
+        "budgets, savings rates or tax figures computed from the old salary",
+        "anything stating the user's pay"
       ],
       "persistence_guidance": "3-5 later-turn memories in the finances domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
@@ -660,6 +686,10 @@
         "The user's office runs a shuttle bus from the city centre.",
         "The user learned to drive at 18."
       ],
+      "forbidden": [
+        "other uses of the Swift (trips, carpools, fuel, insurance, tolls)",
+        "any other car the user owns"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the vehicle domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user read an article about highway toll rates.",
@@ -675,7 +705,7 @@
         },
         {
           "q": "How does the user travel to the client sites in Nashik on Thursdays?",
-          "gold_answer": "Not in their own car any more (the Swift was given away); the new way is not stated.",
+          "gold_answer": "Not stated; they no longer drive the Swift there since giving it to their brother-in-law.",
           "depends_on": [
             "M2"
           ]
@@ -773,6 +803,9 @@
         "The user enjoys houseboat trips in Alappuzha.",
         "The user's college friend works in Kochi."
       ],
+      "forbidden": [
+        "routines, services or people tied to the Kakkanad flat (neighbours, shops, gym, utilities, commute)"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the residence domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user ordered a bookshelf online.",
@@ -788,7 +821,7 @@
         },
         {
           "q": "How does the user get to the Infopark office?",
-          "gold_answer": "Not on foot from Kakkanad any more (they moved to Thrissur); the current commute is not stated.",
+          "gold_answer": "Not stated; they no longer walk there from the Kakkanad flat since moving to Thrissur.",
           "depends_on": [
             "M2"
           ]
@@ -886,6 +919,10 @@
         "The user drinks two cups of coffee a day.",
         "The user's office has a rooftop terrace."
       ],
+      "forbidden": [
+        "cigarette purchases, smoking spots, lighters or other nicotine habits",
+        "health checks or advice given because of smoking"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the health habit domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user booked a dental cleaning.",
@@ -901,7 +938,7 @@
         },
         {
           "q": "What does the user do at 4 pm on workdays?",
-          "gold_answer": "No longer the smoke break with colleagues (they quit smoking); nothing else is stated.",
+          "gold_answer": "Not stated; they no longer take the 4 pm smoke break since quitting smoking.",
           "depends_on": [
             "M2"
           ]
@@ -986,6 +1023,10 @@
         "The user cooks with mustard oil.",
         "The user's office pantry stocks biscuits."
       ],
+      "forbidden": [
+        "sweet foods or drinks the user consumes (desserts, sweetened coffee, mithai)",
+        "sugar purchases"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the diet domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user tried a new dosa place near work.",
@@ -1001,7 +1042,7 @@
         },
         {
           "q": "What does the user usually order for dessert when eating out?",
-          "gold_answer": "Nothing sweet any more since cutting out sugar (they used to order gulab jamun).",
+          "gold_answer": "Not stated; they no longer order gulab jamun since cutting out sugar.",
           "depends_on": [
             "M3"
           ]
@@ -1086,6 +1127,10 @@
         "The user watches wildlife documentaries.",
         "The user's neighbour keeps a spare key to the user's flat."
       ],
+      "forbidden": [
+        "anything about caring for Toffee (vet, hutch, food, sitter, grooming)",
+        "any other pet of the user"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the pet domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user saw a peacock on their morning walk.",
@@ -1094,7 +1139,7 @@
       "eval_questions": [
         {
           "q": "What does the user buy from the Sector 17 pet shop every fortnight?",
-          "gold_answer": "Nothing any more; the hay and pellets were for Toffee, who has died.",
+          "gold_answer": "Not stated; they no longer buy hay and rabbit pellets there since Toffee died.",
           "depends_on": [
             "M2"
           ]
@@ -1199,6 +1244,10 @@
         "The user's parents celebrate Diwali in Ujjain.",
         "The user goes to a pottery class on Saturdays."
       ],
+      "forbidden": [
+        "plans, routines, gifts or shared things with Arjun",
+        "Arjun's family as the user's future in-laws"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the relationship domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user bought a new kurta for a wedding.",
@@ -1207,14 +1256,14 @@
       "eval_questions": [
         {
           "q": "Where will the user spend Diwali this year?",
-          "gold_answer": "Not with Arjun's family any more (they broke up); the new plan is not stated.",
+          "gold_answer": "Not stated; they no longer plan to spend it with Arjun's family since the break-up.",
           "depends_on": [
             "M3"
           ]
         },
         {
           "q": "What are the user's usual Friday evening plans?",
-          "gold_answer": "No longer the Friday dinner with Arjun; nothing else is stated.",
+          "gold_answer": "Not stated; they no longer have the Friday dinner with Arjun since the break-up.",
           "depends_on": [
             "M2"
           ]
@@ -1312,6 +1361,10 @@
         "The user reads business news on weekends.",
         "The user's coaching-centre friend runs a quiz club."
       ],
+      "forbidden": [
+        "CAT study material, mock tests, coaching or MBA targets",
+        "the user's plans built around the CAT timeline"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the education domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user attended a webinar on resume writing.",
@@ -1320,14 +1373,14 @@
       "eval_questions": [
         {
           "q": "What does the user do on weekends in Jaipur?",
-          "gold_answer": "No longer CAT coaching classes (they dropped the CAT plan); nothing else is stated.",
+          "gold_answer": "Not stated; they no longer attend CAT coaching there since dropping the CAT plan.",
           "depends_on": [
             "M2"
           ]
         },
         {
           "q": "Which institute does the user want to join?",
-          "gold_answer": "Not IIM Ahmedabad any more; they plan a data-science master's abroad (institute not named).",
+          "gold_answer": "Not stated; they no longer aim for IIM Ahmedabad since switching to a data-science master's abroad.",
           "depends_on": [
             "M4"
           ]
@@ -1425,6 +1478,10 @@
         "The user's sister has a home loan from a different bank.",
         "The user files taxes in July every year."
       ],
+      "forbidden": [
+        "the loan's schedule, interest or lender",
+        "purchases or budgets that wait on or include the EMI"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the finances domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user compared prices of sofas online.",
@@ -1433,14 +1490,14 @@
       "eval_questions": [
         {
           "q": "What does the user do with money on the 2nd of each month?",
-          "gold_answer": "Nothing stated now; the Rs 9,000 set aside for the loan instalment is no longer needed since the loan is paid off.",
+          "gold_answer": "Not stated; they no longer set aside Rs 9,000 for the loan instalment since paying off the loan.",
           "depends_on": [
             "M2"
           ]
         },
         {
           "q": "What is holding up the user's sofa purchase?",
-          "gold_answer": "Nothing now; they were waiting to clear the loan, which is paid off.",
+          "gold_answer": "Nothing stated; the wait to clear the loan no longer applies since the loan is paid off.",
           "depends_on": [
             "M3"
           ]
@@ -1538,6 +1595,10 @@
         "The user's building basement floods during heavy rain.",
         "The user shops at the mall on Saturdays."
       ],
+      "forbidden": [
+        "other uses of the Ather (trips, servicing, insurance, accessories)",
+        "the ride to the metro station or parking there"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the vehicle domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user read about a new metro line opening next year.",
@@ -1546,14 +1607,14 @@
       "eval_questions": [
         {
           "q": "Where does the user park their two-wheeler on weekdays?",
-          "gold_answer": "Nowhere stated now: they used to leave the Ather at the metro station lot, but it was stolen.",
+          "gold_answer": "Not stated; they no longer park the Ather at the metro station lot since it was stolen.",
           "depends_on": [
             "M3"
           ]
         },
         {
           "q": "How does the user get to the metro station in the morning?",
-          "gold_answer": "Not on the Ather any more (it was stolen); the new way is not stated.",
+          "gold_answer": "Not stated; they no longer ride the Ather there since it was stolen.",
           "depends_on": [
             "M2"
           ]
@@ -1651,6 +1712,9 @@
         "The user's father worked at Kaveri Constructions for 20 years.",
         "The user's home in Navsari has a mango tree."
       ],
+      "forbidden": [
+        "site tasks, site colleagues, safety gear, the site camp, Surat routines or weekend travel from Surat"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the job domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user signed up for a course on project scheduling software.",
@@ -1659,14 +1723,14 @@
       "eval_questions": [
         {
           "q": "How does the user get home to Navsari at the end of the week?",
-          "gold_answer": "No longer by the Friday bus from the Surat site camp (they moved to the Ahmedabad head office); the current route is not stated.",
+          "gold_answer": "Not stated; they no longer take the Friday bus from the Surat site camp since moving to the Ahmedabad head office.",
           "depends_on": [
             "M3"
           ]
         },
         {
           "q": "Where does the user stay on weekdays?",
-          "gold_answer": "Not at the Surat site camp any more (transferred to the Ahmedabad head office); the new accommodation is not stated.",
+          "gold_answer": "Not stated; they no longer stay at the Surat site camp since moving to the Ahmedabad head office.",
           "depends_on": [
             "M2"
           ]
@@ -1764,6 +1828,10 @@
         "The user owns a plot of land in Ludhiana.",
         "The user's son plays football for the school team."
       ],
+      "forbidden": [
+        "routines tied to Sector 22 (neighbours, local shops, park, association)",
+        "the son's route or distance to school"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the residence domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user bought a new water purifier.",
@@ -1772,14 +1840,14 @@
       "eval_questions": [
         {
           "q": "How does the user's son get to school in the morning?",
-          "gold_answer": "No longer a walk with the neighbours' kids (the family moved to Mohali); the current arrangement is not stated.",
+          "gold_answer": "Not stated; he no longer walks with the neighbours' kids since the family moved to Mohali.",
           "depends_on": [
             "M3"
           ]
         },
         {
           "q": "Which committee is the user a member of?",
-          "gold_answer": "None stated now; they were on the Sector 22 residents' welfare association committee before moving to Mohali.",
+          "gold_answer": "Not stated; they are no longer on the Sector 22 residents' welfare association committee since moving to Mohali.",
           "depends_on": [
             "M4"
           ]
@@ -1875,7 +1943,11 @@
       "hard_negative_guidance": "Add ~10 same-domain memories that share words with the chain (people, places, objects) but are not on it. Do not add further dependents of the root. Fitness-adjacent facts that survive the switch (sleep, step tracking, family).",
       "hard_negative_examples": [
         "The user sleeps by 10:30 pm on weeknights.",
-        "The user's gym is next to a juice bar."
+        "The user's building has a small gym on the ground floor."
+      ],
+      "forbidden": [
+        "gym sessions, gym equipment, weight training or Rakesh",
+        "other heavy exercise the user does now (running, contact sports)"
       ],
       "persistence_guidance": "3-5 later-turn memories in the health habit domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
@@ -1885,7 +1957,7 @@
       "eval_questions": [
         {
           "q": "How much does the user spend on personal training each month?",
-          "gold_answer": "Nothing stated now: the Rs 3,000 a month to trainer Rakesh was for gym weight sessions, which stopped when they cancelled the gym.",
+          "gold_answer": "Not stated; they no longer pay trainer Rakesh Rs 3,000 a month since cancelling the gym.",
           "depends_on": [
             "M3"
           ]
@@ -1990,6 +2062,9 @@
         "The user's neighbour's cook makes excellent biryani.",
         "The user drinks a glass of buttermilk after lunch."
       ],
+      "forbidden": [
+        "meals Savita cooks, her schedule, groceries bought for her or payments to her"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the diet domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user bought a new set of steel lunch boxes.",
@@ -1998,14 +2073,14 @@
       "eval_questions": [
         {
           "q": "What does the user take to the office for lunch?",
-          "gold_answer": "Not leftovers of Savita's dinners any more (Savita has left and no new cook is found); the current lunch is not stated.",
+          "gold_answer": "Not stated; they no longer carry leftovers of Savita's dinners since Savita left.",
           "depends_on": [
             "M3"
           ]
         },
         {
           "q": "Who cooks the user's weekday meals?",
-          "gold_answer": "No one stated: Savita used to, but she has left and no new cook has been found.",
+          "gold_answer": "Not stated; Savita no longer cooks for them since she left, and no new cook has been found.",
           "depends_on": [
             "M1"
           ]
@@ -2101,7 +2176,11 @@
       "hard_negative_guidance": "Add ~10 same-domain memories that share words with the chain (people, places, objects) but are not on it. Do not add further dependents of the root. Relationship history, the partner's family, similarly named people.",
       "hard_negative_examples": [
         "Ishaan's parents live in Shillong.",
-        "The user and Ishaan adopted a plant-care routine for the balcony."
+        "Ishaan studied at IIT Guwahati."
+      ],
+      "forbidden": [
+        "things the user and Ishaan do together in person in Guwahati",
+        "Ishaan's local commute, car or Guwahati routines"
       ],
       "persistence_guidance": "3-5 later-turn memories in the relationship domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
@@ -2111,14 +2190,14 @@
       "eval_questions": [
         {
           "q": "How does the user get to work in the morning?",
-          "gold_answer": "No longer dropped by Ishaan (Ishaan moved to Toronto); the current way is not stated.",
+          "gold_answer": "Not stated; Ishaan no longer drops them since moving to Toronto.",
           "depends_on": [
             "M2"
           ]
         },
         {
           "q": "Who does the user cook weekday dinners with?",
-          "gold_answer": "Not with Ishaan any more since Ishaan moved to Toronto; no one else is stated.",
+          "gold_answer": "Not stated; they no longer cook with Ishaan since Ishaan moved to Toronto.",
           "depends_on": [
             "M4"
           ]
@@ -2216,6 +2295,10 @@
         "The user sketches in a notebook on the metro.",
         "The user's favourite font is Futura."
       ],
+      "forbidden": [
+        "classes, assignments, fees, teachers or classmates of the diploma",
+        "the bakery project or its reviews"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the education domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user visited an exhibition of film posters.",
@@ -2224,14 +2307,14 @@
       "eval_questions": [
         {
           "q": "Who does the user meet every Saturday, and why?",
-          "gold_answer": "No one stated now: the Saturday reviews with the bakery owner were for the diploma project, and the user has withdrawn from the diploma.",
+          "gold_answer": "Not stated; they no longer meet the bakery owner for project reviews since withdrawing from the diploma.",
           "depends_on": [
             "M3"
           ]
         },
         {
           "q": "What is the user's diploma final project?",
-          "gold_answer": "None now; they withdrew (it was a brand identity for a local bakery).",
+          "gold_answer": "None; the bakery brand-identity project no longer applies since they withdrew from the diploma.",
           "depends_on": [
             "M2"
           ]
@@ -2329,6 +2412,10 @@
         "The user's partner uses a OnePlus phone.",
         "The user prefers phones with small screens."
       ],
+      "forbidden": [
+        "Samsung-only phone features (Samsung Wallet, DeX, Samsung Pay, Galaxy-only apps)",
+        "the phone's model, case or storage"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the devices domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user bought a braided USB-C cable.",
@@ -2337,14 +2424,14 @@
       "eval_questions": [
         {
           "q": "How does the user get through the office gate in the morning?",
-          "gold_answer": "Not by tapping the Samsung Wallet access card any more (they sold the Samsung for a Pixel 9); the current method is not stated.",
+          "gold_answer": "Not stated; they no longer tap a Samsung Wallet access card since switching to a Pixel.",
           "depends_on": [
             "M3"
           ]
         },
         {
           "q": "How does the user pay at shops?",
-          "gold_answer": "Not with Samsung Wallet any more (they sold the Samsung); the current method is not stated.",
+          "gold_answer": "Not stated; they no longer use Samsung Wallet since switching to a Pixel.",
           "depends_on": [
             "M2"
           ]
@@ -2354,6 +2441,13 @@
           "gold_answer": "Samsung.",
           "depends_on": [
             "M5"
+          ]
+        },
+        {
+          "q": "How does the user connect their phone to a monitor for presentations?",
+          "gold_answer": "Not stated; they no longer use Samsung DeX since switching to a Pixel.",
+          "depends_on": [
+            "M4"
           ]
         }
       ]
@@ -2442,6 +2536,10 @@
         "The user enjoys road trips to the Konkan coast.",
         "The user's colleague Fatima lives two streets away."
       ],
+      "forbidden": [
+        "other uses of the Creta, the carpool, the colleagues' contributions or what that money pays for",
+        "any other car the user drives"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the vehicle domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user compared prices of Andaman ferry tickets.",
@@ -2450,14 +2548,14 @@
       "eval_questions": [
         {
           "q": "How is the user funding the recurring deposit for their Andaman trip?",
-          "gold_answer": "No longer with the carpool fuel money (the carpool ended when they returned the leased Creta); the current funding is not stated.",
+          "gold_answer": "Not stated; they no longer fund it with the carpool fuel money since returning the leased Creta.",
           "depends_on": [
             "M4"
           ]
         },
         {
           "q": "How does the user get to work on weekdays?",
-          "gold_answer": "No longer by driving the leased Creta in the carpool (it was returned); the current mode is not stated.",
+          "gold_answer": "Not stated; they no longer drive the leased Creta in the carpool since returning it.",
           "depends_on": [
             "M2"
           ]
@@ -2555,6 +2653,9 @@
         "The user has eight years of experience in automotive quality control.",
         "The user's sister lives near Guindy."
       ],
+      "forbidden": [
+        "Zephyr plant routines, shifts, colleagues, canteen, the company bus or the drop to the bus stop"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the job domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user updated their CV.",
@@ -2563,14 +2664,14 @@
       "eval_questions": [
         {
           "q": "Where does the user's wife drop them in the morning?",
-          "gold_answer": "Nowhere stated now: she used to drop them at the Guindy stop for the Zephyr company bus, but they quit Zephyr Motors.",
+          "gold_answer": "Not stated; she no longer drops them at the Guindy stop for the Zephyr bus since they quit Zephyr Motors.",
           "depends_on": [
             "M4"
           ]
         },
         {
           "q": "How does the user travel to work?",
-          "gold_answer": "Not on the Zephyr company bus any more (they quit Zephyr Motors); no current job or commute is stated.",
+          "gold_answer": "Not stated; they no longer take the Zephyr company bus since quitting Zephyr Motors.",
           "depends_on": [
             "M2"
           ]
@@ -2668,6 +2769,10 @@
         "The user's parents' house in Ajmer has a courtyard.",
         "The user's friend is the treasurer of a cricket club."
       ],
+      "forbidden": [
+        "Silver Oak routines, neighbours, association duties, maintenance or security arrangements",
+        "anything tied to living in Malviya Nagar"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the residence domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user bought a ceiling fan online.",
@@ -2676,14 +2781,14 @@
       "eval_questions": [
         {
           "q": "Who does the user meet on the first Saturday of every month?",
-          "gold_answer": "No one stated now: those meetings with the security agency's supervisor were part of the Silver Oak treasurer role, which ended when they moved to Ajmer.",
+          "gold_answer": "Not stated; they no longer meet the security agency's supervisor since leaving the Silver Oak treasurer role on moving to Ajmer.",
           "depends_on": [
             "M4"
           ]
         },
         {
           "q": "What role does the user hold in a residents' association?",
-          "gold_answer": "None now; they were treasurer of the Silver Oak residents' association before moving to Ajmer.",
+          "gold_answer": "Not stated; they are no longer treasurer of the Silver Oak residents' association since moving to Ajmer.",
           "depends_on": [
             "M2"
           ]
@@ -2781,6 +2886,10 @@
         "Dev plays cricket for his school.",
         "The user's building has a small lawn."
       ],
+      "forbidden": [
+        "Bruno's daily care, food, vet, walks or toys",
+        "Dev's work for the user or his pay"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the pet domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user bought a framed photo of a Labrador puppy.",
@@ -2789,7 +2898,7 @@
       "eval_questions": [
         {
           "q": "How much does the user pay Dev each month?",
-          "gold_answer": "Nothing now: the Rs 3,000 was for walking Bruno, who has gone to the uncle's farm in Coorg.",
+          "gold_answer": "Not stated; they no longer pay Dev Rs 3,000 for walking Bruno since Bruno went to the farm in Coorg.",
           "depends_on": [
             "M3"
           ]
@@ -2907,6 +3016,10 @@
         "The user's younger brother studies chemistry at the same university.",
         "The user likes Odia sweets."
       ],
+      "forbidden": [
+        "hostel life, campus routines, lab work, the fellowship or PhD deadlines",
+        "routines the user shares with Anirban"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the education domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user read a review article on green chemistry.",
@@ -2915,14 +3028,14 @@
       "eval_questions": [
         {
           "q": "Who does the user cook late-night Maggi with?",
-          "gold_answer": "No one stated now: they cooked with roommate Anirban in the hostel, but they have left the PhD and moved out of campus.",
+          "gold_answer": "Not stated; they no longer cook with roommate Anirban since leaving the PhD and the hostel.",
           "depends_on": [
             "M4"
           ]
         },
         {
           "q": "Who is the user's PhD supervisor?",
-          "gold_answer": "None now; Prof. Mohanty supervised them until they left the PhD.",
+          "gold_answer": "None; Prof. Mohanty is no longer their supervisor since they left the PhD.",
           "depends_on": [
             "M5"
           ]
@@ -3020,6 +3133,10 @@
         "The user's brother also built a desktop PC.",
         "The user's parents subscribe to a cable TV package."
       ],
+      "forbidden": [
+        "things running on or attached to the desktop (servers, backups, peripherals, installed games)",
+        "the parents' viewing from the Plex server"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the devices domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user bought a laptop stand.",
@@ -3028,7 +3145,7 @@
       "eval_questions": [
         {
           "q": "How do the user's parents watch old Hindi films on the living-room TV?",
-          "gold_answer": "Not from the Plex server any more: it ran on the desktop PC the user sold; the current way is not stated.",
+          "gold_answer": "Not stated; they no longer watch from the Plex server since the desktop PC that ran it was sold.",
           "depends_on": [
             "M3"
           ]
@@ -3133,6 +3250,9 @@
         "The user has a PPF account at the post office.",
         "The user's electricity provider sends bills by SMS."
       ],
+      "forbidden": [
+        "the Saraswat account's balance, cards, cheques, autopays, standing instructions or offers"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the finances domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user read about new UPI transaction limits.",
@@ -3141,14 +3261,14 @@
       "eval_questions": [
         {
           "q": "How is the user's electricity bill paid each month?",
-          "gold_answer": "Not by the Saraswat RuPay card any more (the Saraswat account is closed); the current payment method is not stated.",
+          "gold_answer": "Not stated; it is no longer auto-paid with the Saraswat RuPay card since the account was closed.",
           "depends_on": [
             "M3"
           ]
         },
         {
           "q": "What cashback does the user earn on the electricity bill?",
-          "gold_answer": "None stated now: the cashback came from the Saraswat RuPay bill-pay offer, and that account is closed.",
+          "gold_answer": "Not stated; they no longer get the RuPay bill-pay cashback since the Saraswat account was closed.",
           "depends_on": [
             "M4"
           ]
@@ -3223,6 +3343,9 @@
       "hard_negative_examples": [
         "The user's driving instructor now runs a used-car showroom.",
         "The user's office colleague is selling a Honda Amaze."
+      ],
+      "forbidden": [
+        "uses of the user's own Honda City (commute, fuel, servicing, parking, insurance)"
       ],
       "persistence_guidance": "3-5 later-turn memories in the vehicle domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
@@ -3315,6 +3438,9 @@
         "The user shops at the Meridian Retail store near home.",
         "The user's mentor runs analytics at a hospital."
       ],
+      "forbidden": [
+        "the user's work at Meridian (team, manager, projects, office, perks)"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the job domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user signed up for an SQL meetup.",
@@ -3405,6 +3531,10 @@
       "hard_negative_examples": [
         "The user's bicycle is a Firefox hybrid.",
         "The user's daughter is learning to ride a cycle."
+      ],
+      "forbidden": [
+        "other Saturday or Sunday morning routines of the user",
+        "who the user meets on the ride or where it starts"
       ],
       "persistence_guidance": "3-5 later-turn memories in the health habit domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
@@ -3497,6 +3627,9 @@
         "The user's uncle supplies milk to a local cooperative.",
         "The user buys a newspaper from the dairy shop's counter."
       ],
+      "forbidden": [
+        "dairy foods or drinks the user consumes (milky tea, curd, paneer, ghee in their food, ice cream)"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the diet domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user tried a new breakfast cereal.",
@@ -3588,6 +3721,9 @@
         "The user's father goes fishing at a lake near Panvel.",
         "The user's aquarium sits on a teak stand."
       ],
+      "forbidden": [
+        "the number or kinds of fish in the user's tank, or care tied to them"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the pet domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user read about water hardness for tropical fish.",
@@ -3669,6 +3805,9 @@
       "hard_negative_examples": [
         "Neel's sister is a doctor in Mysore.",
         "The user's landlord is called Mr. Bhatt."
+      ],
+      "forbidden": [
+        "rent, chores, groceries, bills or routines the user shares with Neel"
       ],
       "persistence_guidance": "3-5 later-turn memories in the relationship domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
@@ -3761,6 +3900,9 @@
         "The user's smartwatch strap is torn.",
         "The user's father dropped his phone in a bucket last year."
       ],
+      "forbidden": [
+        "plans to repair the phone screen, or problems caused by the crack"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the devices domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user bought a microfibre cleaning cloth.",
@@ -3842,6 +3984,9 @@
       "hard_negative_examples": [
         "The user's Canara Bank branch is near the bus depot.",
         "The user's friend works at a mutual fund house."
+      ],
+      "forbidden": [
+        "the FD's interest, maturity date, nominee or what it was earmarked for"
       ],
       "persistence_guidance": "3-5 later-turn memories in the finances domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
@@ -3941,7 +4086,10 @@
       "hard_negative_guidance": "Add ~10 same-domain memories that share words with the hedged plan but are independent of the root. Do not add further dependents of the root. Baking, cafés and business ideas that hold either way.",
       "hard_negative_examples": [
         "The user took a weekend baking course last year.",
-        "The user's manager at Finverse is from Kanpur."
+        "The user's cousin is a pastry chef in Delhi."
+      ],
+      "forbidden": [
+        "Finverse benefits, colleagues, office routines or salary"
       ],
       "persistence_guidance": "3-5 later-turn memories in the job domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
@@ -4040,8 +4188,11 @@
       ],
       "hard_negative_guidance": "Add ~10 same-domain memories that share words with the hedged plan but are independent of the root. Do not add further dependents of the root. Gotri and Vadodara places tied to other people or work.",
       "hard_negative_examples": [
-        "The user's landlord is a retired professor.",
+        "The user's in-laws in Gotri run a stationery shop.",
         "The user likes the Sayaji Baug park."
+      ],
+      "forbidden": [
+        "routines tied to the Alkapuri flat (neighbours, landlord, local shops, school run, utilities)"
       ],
       "persistence_guidance": "3-5 later-turn memories in the residence domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
@@ -4143,6 +4294,9 @@
         "The user owns three pairs of running shoes.",
         "The user's physio clinic is near the stadium."
       ],
+      "forbidden": [
+        "running routes, running partners, races or training plans"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the health habit domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user bought a foam roller.",
@@ -4242,6 +4396,9 @@
       "hard_negative_examples": [
         "The user dislikes paneer.",
         "The user's office canteen serves a vegetarian thali."
+      ],
+      "forbidden": [
+        "meat dishes or meat purchases the user has regularly"
       ],
       "persistence_guidance": "3-5 later-turn memories in the diet domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
@@ -4343,6 +4500,10 @@
         "The user's neighbour has a Siamese cat.",
         "Kesar is ten years old."
       ],
+      "forbidden": [
+        "Elaichi's routines, care or supplies",
+        "how many cats the user has"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the pet domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user bought a lint roller.",
@@ -4351,7 +4512,7 @@
       "eval_questions": [
         {
           "q": "How many cats does the user have?",
-          "gold_answer": "Two, Kesar and Elaichi (they might rehome Elaichi depending on the son's allergy test).",
+          "gold_answer": "Two cats, Kesar and Elaichi.",
           "depends_on": [
             "M1"
           ]
@@ -4442,6 +4603,9 @@
       "hard_negative_examples": [
         "The user's parents have been married for 30 years.",
         "The user likes jigarthanda from a Madurai shop."
+      ],
+      "forbidden": [
+        "plans, visits, gifts or shared routines with Kavin"
       ],
       "persistence_guidance": "3-5 later-turn memories in the relationship domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
@@ -4543,6 +4707,9 @@
         "The user's college library lets them borrow four books at a time.",
         "The user enjoys stargazing."
       ],
+      "forbidden": [
+        "physics classes, labs, professors, projects or plans tied to the physics major"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the education domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user bought a scientific calculator.",
@@ -4602,9 +4769,9 @@
         },
         {
           "id": "M3",
-          "text": "The user's ThinkPad lid is covered in hackathon stickers.",
+          "text": "The user carries the ThinkPad to a co-working space every weekday.",
           "entity": "user",
-          "attribute": "laptop_appearance",
+          "attribute": "laptop_use",
           "source": "user",
           "role": "dependent",
           "gold_action": "VERIFY"
@@ -4643,6 +4810,9 @@
         "The user's office issues a desktop workstation.",
         "The user's YouTube channel reviews budget cameras."
       ],
+      "forbidden": [
+        "uses, accessories or settings of the ThinkPad"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the devices domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user bought a webcam cover.",
@@ -4676,9 +4846,9 @@
       "family_id": "conflicting_source__vehicle",
       "category": "conflicting_source",
       "domain": "vehicle",
-      "pattern": "Neighbour reports the car is for sale; third-party report contradicts a user-stated memory: the user's own statement is kept but flagged (root and dependents VERIFY).",
+      "pattern": "Neighbour reports the car was sold; third-party report contradicts a user-stated memory: the user's own statement is kept but flagged (root and dependents VERIFY).",
       "observation": {
-        "text": "Message from the user's neighbour: the user's Nexon EV has been listed for sale on OLX.",
+        "text": "Message from the user's neighbour: the user sold their Nexon EV last week, and the buyer collected it on Sunday.",
         "source": "third_party"
       },
       "core_memories": [
@@ -4743,6 +4913,9 @@
         "The user's office has four EV charging bays.",
         "The user browses OLX for second-hand furniture."
       ],
+      "forbidden": [
+        "other uses of the Nexon (trips, home charging, servicing, insurance, loan)"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the vehicle domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user read about a new EV battery warranty.",
@@ -4751,7 +4924,7 @@
       "eval_questions": [
         {
           "q": "What car does the user drive?",
-          "gold_answer": "A Tata Nexon EV (a neighbour reports it is listed for sale; not confirmed by the user).",
+          "gold_answer": "A Tata Nexon EV (a neighbour reports it was sold; not confirmed by the user).",
           "depends_on": [
             "M1"
           ]
@@ -4843,6 +5016,10 @@
         "The user's cousin Varun lives in Hyderabad.",
         "The user starts work at 9:30 am."
       ],
+      "forbidden": [
+        "inferred Quantel work details (team, tools, office, colleagues)",
+        "software-engineering tasks presented as the user's job"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the job domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user attended a product-management meetup.",
@@ -4858,7 +5035,7 @@
         },
         {
           "q": "Which platform does the user write code for at work?",
-          "gold_answer": "None stated: the Quantel billing-platform work was a wrong inference; they are a product manager at Brightpath.",
+          "gold_answer": "Not stated; the Quantel billing-platform work no longer holds since the user never worked at Quantel (they are a product manager at Brightpath).",
           "depends_on": [
             "M2"
           ]
@@ -4942,6 +5119,9 @@
       "hard_negative_examples": [
         "The user drinks green tea in the afternoon.",
         "The user's team goes out on the last Friday of the month."
+      ],
+      "forbidden": [
+        "the user's alcohol-free habits at social events (driving, drink orders, toasts)"
       ],
       "persistence_guidance": "3-5 later-turn memories in the health habit domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
@@ -5039,6 +5219,9 @@
         "Rocky's vet is Dr. Fernandes.",
         "The user walks Rocky by the river."
       ],
+      "forbidden": [
+        "breed-based facts about Rocky (breed club, breed-specific diet, grooming, health screening)"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the pet domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user bought a new leash.",
@@ -5054,7 +5237,7 @@
         },
         {
           "q": "Which dog show does the user want to enter Rocky in?",
-          "gold_answer": "None stated now; the German Shepherd show was based on the wrong breed (Rocky is a Belgian Malinois).",
+          "gold_answer": "Not stated; the German Shepherd show no longer applies since Rocky is a Belgian Malinois.",
           "depends_on": [
             "M2"
           ]
@@ -5138,6 +5321,9 @@
       "hard_negative_examples": [
         "The user's aunt lives in Kanpur.",
         "The user and Priyanka are on the same project."
+      ],
+      "forbidden": [
+        "the user's dating, matchmaking or partner-seeking activities"
       ],
       "persistence_guidance": "3-5 later-turn memories in the relationship domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
@@ -5239,6 +5425,9 @@
         "The user's classmate Sohini runs a WhatsApp group for admission updates.",
         "The user reads The Economist."
       ],
+      "forbidden": [
+        "DSE-dependent plans (hostel, travel, course registration, fees, the move to Delhi)"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the education domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user bought a winter jacket.",
@@ -5338,6 +5527,9 @@
       "hard_negative_examples": [
         "The user's tax filing is done by a CA, Mr. Joshi.",
         "The user's mother holds an LIC policy too."
+      ],
+      "forbidden": [
+        "the LIC policy's premium, cover, nominee, maturity or tax treatment"
       ],
       "persistence_guidance": "3-5 later-turn memories in the finances domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
@@ -5439,10 +5631,14 @@
         "The user's brother-in-law recommended the body shop.",
         "The user has the Ola app on their phone."
       ],
+      "forbidden": [
+        "trips or routines that use the Ertiga",
+        "the user's own driving habits (fuel, parking, routes)"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the vehicle domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user read about monsoon tyre care.",
-        "The user's parents planned a temple visit with relatives."
+        "The user's parents bought new brass prayer lamps."
       ],
       "eval_questions": [
         {
@@ -5539,6 +5735,9 @@
         "The user's in-laws have a pet parrot.",
         "The user's flat has two balconies."
       ],
+      "forbidden": [
+        "routines tied to being at the Thane flat (deliveries, commute, daily neighbours, home chores)"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the residence domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user picked paint colours from a shade card.",
@@ -5625,6 +5824,9 @@
       "hard_negative_examples": [
         "The user's swimming goggles are prescription lenses.",
         "The municipal pool is near the user's office."
+      ],
+      "forbidden": [
+        "routines at the municipal pool (sessions, coach, lane bookings)"
       ],
       "persistence_guidance": "3-5 later-turn memories in the health habit domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
@@ -5726,6 +5928,9 @@
         "The stall near the user's office is run by Ramesh.",
         "The user owns a cast-iron tawa."
       ],
+      "forbidden": [
+        "spicy or street-food habits of the user (dishes, stalls, condiments)"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the diet domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user watched a documentary on spice farms.",
@@ -5825,6 +6030,9 @@
       "hard_negative_examples": [
         "The user's neighbour's dog barks at night.",
         "Kalu is scared of fireworks."
+      ],
+      "forbidden": [
+        "daily routines with Kalu at home (walks, feeding, sleeping, play)"
       ],
       "persistence_guidance": "3-5 later-turn memories in the pet domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
@@ -5926,6 +6134,9 @@
         "The user's router sits in the hallway cabinet.",
         "The user's TV is wall-mounted."
       ],
+      "forbidden": [
+        "uses of the home internet (streaming, smart devices, backups, video calls on home Wi-Fi)"
+      ],
       "persistence_guidance": "3-5 later-turn memories in the devices domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [
         "The user tidied the cables behind the TV.",
@@ -6025,6 +6236,9 @@
       "hard_negative_examples": [
         "The user keeps Rs 2,000 in cash at home for emergencies.",
         "The user's ICICI statement is generated on the 3rd."
+      ],
+      "forbidden": [
+        "payments charged to the ICICI card (subscriptions, autopays, regular purchases)"
       ],
       "persistence_guidance": "3-5 later-turn memories in the finances domain, dated after the observation, that neither restate, confirm nor contradict the change and change no gold answer.",
       "persistence_examples": [

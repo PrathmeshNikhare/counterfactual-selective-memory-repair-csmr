@@ -25,11 +25,12 @@
     "three_hop__education",
     "false_similarity__pet",
     "weak_evidence__devices",
-    "conflicting_source__relationship"
+    "conflicting_source__relationship",
+    "direct_contradiction__diet",
+    "temporary_change__vehicle"
   ],
   "train": [
     "direct_contradiction__residence",
-    "direct_contradiction__diet",
     "direct_contradiction__relationship",
     "direct_contradiction__education",
     "direct_contradiction__devices",
@@ -59,7 +60,6 @@
     "conflicting_source__health_habit",
     "conflicting_source__pet",
     "conflicting_source__finances",
-    "temporary_change__vehicle",
     "temporary_change__residence",
     "temporary_change__health_habit",
     "temporary_change__pet",

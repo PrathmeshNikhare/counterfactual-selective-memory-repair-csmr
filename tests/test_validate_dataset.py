@@ -25,7 +25,7 @@ def fake_embed(monkeypatch):
 def test_seeds_valid_and_split():
     errs, items, split_of = vd.check_seeds(ROOT / "data/seeds")
     assert errs == [] and vd.near_dups(items, vd.reference_texts(), LIM["near_dup_cosine"]) == []
-    assert Counter(split_of.values()) == {"test": 18, "val": 6, "train": 36}
+    assert Counter(split_of.values()) == {"test": 18, "val": 8, "train": 34}
 
 
 def _scenario(fam):
