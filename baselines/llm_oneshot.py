@@ -35,7 +35,7 @@ def _ok(out: dict) -> bool:
 def decide(delta, obs, roots, store, cfg):
     mems = store.all()
     prompt = ONESHOT_PROMPT.format(time=obs.time[:10], source=obs.source, obs=obs.text,
-                                   memories="\n".join(f"- {m.id} [{m.time[:10]}]: {m.text}" for m in mems))
+                                   memories="\n".join(f"- {m.id} [{m.time[:10] or 'undated'}]: {m.text}" for m in mems))
     out = llm.try_json_valid(prompt, _ok, max_tokens=cfg["oneshot_max_tokens"], cfg=cfg)
     if out is None:
         llm.fallback("llm_oneshot", "malformed response; every memory KEEP")
