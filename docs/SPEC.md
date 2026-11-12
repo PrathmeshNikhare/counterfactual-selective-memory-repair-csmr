@@ -158,9 +158,9 @@ Per memory: REVOKE → excluded; REVISE → text replaced; VERIFY → text prefi
 ## 9. Downstream agent (`pipeline/agent.py`)
 
 ```python
-def answer(question: str, memories: list[Memory], k: int = 5) -> str
+def answer(question: str, memories: list[Memory], k: int = 5, cfg=None, extra_instruction: str = "") -> str
 ```
-Retrieve top-k by cosine to the question from the given memory list; LLM answers using ONLY those memories; must say "unknown" if not determinable. An empty LLM answer is retried once (changed prompt, double max tokens), then replaced by "unknown"; an empty answer never reaches the judge. Memories rendered with an `[unverified]` prefix (VERIFY) are flagged in the prompt ("Memories marked [unverified] may be outdated; mention the uncertainty."), so the agent surfaces the uncertainty instead of asserting the stale fact. Same agent is used by all baselines and by eval.
+Retrieve top-k by cosine to the question from the given memory list; LLM answers using ONLY those memories. Each retrieved memory is shown with the date it was recorded, `- [YYYY-MM-DD] <text>` (`memory.time[:10]`; "undated" if empty). Instructions: if memories conflict, rely on the most recent one; answer exactly "unknown" only when no retrieved memory addresses the question. This is identical for every method (CSMR selection and validation, baselines, eval). The one permitted difference is `extra_instruction`, a sentence appended to the instruction block (used only by the `recency` baseline, §13): with it, the prompt differs from the shared prompt by that sentence and nothing else. An empty LLM answer is retried once (changed prompt, double max tokens), then replaced by "unknown"; an empty answer never reaches the judge. Memories rendered with an `[unverified]` prefix (VERIFY) are flagged in the prompt ("Memories marked [unverified] may be outdated; mention the uncertainty."), so the agent surfaces the uncertainty instead of asserting the stale fact. Same agent is used by all baselines and by eval.
 
 ## 10. Counterfactual selection (`pipeline/counterfactual.py`) — Paper IV-D, V
 
@@ -243,7 +243,7 @@ Ablation flags (`config.yaml: ablation`):
 
 Each: `def run(obs, store, cfg) -> dict[str, Action]` + revised texts. Same agent, same inputs. Every baseline's final view includes the same appended observation memory (`observation_memory`); only repair actions differ.
 - `append_only`: store observation as new memory, change nothing.
-- `recency`: append; agent instructed to prefer most recent memory.
+- `recency`: append; agent instructed to prefer most recent memory, passed as `answer(..., extra_instruction=...)` so its prompt differs from the shared one (which already shows dates, §9) only in that sentence.
 - `last_write_wins`: REVISE/REVOKE memories with same entity+attribute as Δ only.
 - `similarity_prop`: REVISE every memory with cosine(obs, m) ≥ cfg.sim_prop_threshold.
 - `dependency_only`: CSMR Phase A–C, modify every candidate with P ≥ τd (ignore evidence, no counterfactual).

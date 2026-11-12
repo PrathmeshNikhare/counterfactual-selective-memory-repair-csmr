@@ -52,3 +52,18 @@ def test_agent_retries_empty_then_unknown(monkeypatch):
     calls.clear()
     monkeypatch.setattr(llm, "call", lambda p, **k: calls.append(p) or ("" if len(calls) == 1 else "Blue."))
     assert agent.answer("q?", []) == "Blue." and len(calls) == 2
+
+
+def test_agent_prompt_shows_dates_and_methods_differ_only_in_the_extra_instruction(monkeypatch):
+    from csmr import llm
+    from csmr.pipeline import agent
+    calls = []
+    monkeypatch.setattr(llm, "call", lambda p, **k: calls.append(p) or "x")
+    ms = load_scenario("data/dev/car_sale.json").memories[:2]
+    agent.answer("Does the user own a car?", ms)
+    agent.answer("Does the user own a car?", ms, extra_instruction="EXTRA RULE.")
+    shared, recency = calls
+    assert "- [2026-03-01] The user owns a car." in shared and "- [2026-03-05] The user drives to work by car." in shared
+    assert "If memories conflict, rely on the most recent one." in shared
+    assert 'Answer exactly "unknown" only when no memory below addresses the\nquestion.' in shared
+    assert recency.replace(" EXTRA RULE.", "") == shared and "EXTRA RULE." not in shared
