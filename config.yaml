@@ -131,3 +131,11 @@ persistence_distractors:  # fallback later-turn memories, used only when a scena
   - "The user found a coin from 1987 on the pavement."
   - "The user heard that it rained heavily in a town they have never visited."
   - "The user thinks crossword puzzles were harder a decade ago."
+
+# Benchmark validator limits (eval/validate_dataset.py, docs/DATASET_NOTE.md); not part of config_hash
+dataset:
+  memories_min: 30
+  memories_max: 40
+  persistence_min: 3
+  persistence_max: 5
+  near_dup_cosine: 0.92   # MiniLM cosine above this = near-duplicate text

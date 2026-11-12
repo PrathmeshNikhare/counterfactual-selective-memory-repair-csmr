@@ -40,3 +40,30 @@ Gold `actions` follow these rules (they mirror the action rule in SPEC §6):
 - **VERIFY** — dependents under weak evidence or with an unproven dependency.
 - **CONDITIONAL** — memories affected by a *temporary* change.
 - **KEEP** — everything else.
+
+Two category conventions the seeds fix:
+- **weak_evidence**: root and its dependents are VERIFY (the rule above). `data/dev/bike_maybe.json` predates this and
+  keeps the dependents KEEP; the benchmark follows the rule.
+- **conflicting_source**: the more reliable source wins. A `third_party` observation contradicting a `user` memory →
+  root and dependents VERIFY. A `user` observation correcting an `inferred` / `third_party` memory → REVISE.
+- A dependent is REVISE only when the change makes it false (you can't drive a car you gave away). If it only
+  removes the dependent's reason (a fuel budget, a parking pass), it is VERIFY.
+
+## Seeds and splits (`data/seeds/`)
+
+`seeds.json` holds 60 seed families, one per (category, domain) cell used: 7–8 per category, 6 per domain. A family
+gives the generator a change `pattern`, an example `observation`, `core_memories` (id, text, entity, attribute,
+source, `role` ∈ root | dependent | hard_negative, `gold_action`), `dependencies` (chains are written hop by hop:
+`[[M1, M2], [M2, M3]]`), `hard_negative_guidance` + `hard_negative_examples`, `persistence_guidance` +
+`persistence_examples`, and `eval_questions`. A generated scenario keeps the core memories (paraphrase allowed,
+labels unchanged), pads to 30–40 memories with ~10 hard negatives plus background, adds times, and records its seed
+in a top-level `"family"` field (`load_scenario` ignores it).
+
+`splits.json` assigns families before any generation (test 18 / val 6 / train 36, balanced by category and by
+domain), so all scenarios from one family stay in one split. With 8 categories, two categories
+(direct_contradiction, temporary_change) have no val family.
+
+`python eval/validate_dataset.py` checks the seeds and every `data/generated/<split>/*.json` (schema, gold rules
+above, 30–40 memories, persistence dated after the observation, family/split match, near-duplicates within a
+scenario, across splits and against dev/showcase), and prints count tables per split × category / domain / action.
+Limits are in `config.yaml` → `dataset`.
