@@ -74,7 +74,7 @@ csmr/
   pipeline/counterfactual.py probes, judge, objective, argmax
   pipeline/commit.py        Phase E
   api.py                public CSMR class: observe(), retrieve(), pending_verifications()
-baselines/              append_only, last_write_wins, similarity_prop, dependency_only, evidence_only, llm_oneshot
+baselines/              append_only, last_write_wins, similarity_prop, graph_propagation, dependency_only, evidence_only, llm_oneshot
 eval/                   metrics.py, run_all.py, ablations.py, plots.py
 data/dev/               hand-written dev scenarios (integration tests)
 data/generated/         full dataset (later)

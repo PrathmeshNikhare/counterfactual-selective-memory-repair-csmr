@@ -39,7 +39,7 @@ Integration fixture for everything: `data/dev/car_sale.json`.
 - [x] **I2** ablation flags each change behaviour (test that toggling each flag changes at least one output on dev set).
 
 ## Phase 2 — after dataset exists (see docs/DATASET_NOTE.md)
-- [x] **E1 `baselines/`** — 6 baselines per SPEC §13 (no separate recency baseline: the shared agent is recency-aware).
+- [x] **E1 `baselines/`** — 7 baselines per SPEC §13 (no separate recency baseline: the shared agent is recency-aware; TEPA / STALE/CUPMem not reimplemented, see §13).
 - [x] **E2 `eval/metrics.py`** — all metrics per SPEC §14.
 - [ ] **E3** `fit_dependency` / `fit_evidence` on train split; tune τd, τe, λ on val.
 - [ ] **E4 `eval/run_all.py`** → results/main.csv, per_category.csv.

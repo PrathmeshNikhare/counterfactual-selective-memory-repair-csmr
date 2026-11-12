@@ -48,9 +48,41 @@ def _changed(t):
     return {m: a for m, a in t.final_actions.items() if a != "KEEP"}
 
 
-def test_registry_has_the_six_baselines():
-    assert list(baselines.BASELINES) == ["append_only", "last_write_wins", "similarity_prop", "dependency_only",
-                                         "evidence_only", "llm_oneshot"]
+def test_registry_has_the_seven_baselines():
+    assert list(baselines.BASELINES) == ["append_only", "last_write_wins", "similarity_prop", "graph_propagation",
+                                         "dependency_only", "evidence_only", "llm_oneshot"]
+
+
+# graph (hop_sim 0.35): G1-G2 cos .5, G2-G3 cos .43, G1-G3 0; G6 shares G2's attribute (linked despite cos 0);
+# G4 shares nothing; G5 has G1's attribute but another entity (never linked)
+_S = 0.75 ** 0.5
+_GRAPH = [("G1", "user", "car", (1, 0, 0)), ("G2", "user", "commute", (.5, _S, 0)), ("G3", "user", "fuel", (0, .5, _S)),
+          ("G4", "user", "food", (0, 0, -1)), ("G5", "Acme", "car", (1, 0, 0)), ("G6", "user", "commute", (0, 0, -1))]
+
+
+@pytest.mark.parametrize("hops,change_type,expected", [
+    (1, "remove", {"G1": "REVOKE", "G2": "REVISE"}),
+    (1, "replace", {"G1": "REVISE", "G2": "REVISE"}),
+    (2, "remove", {"G1": "REVOKE", "G2": "REVISE", "G3": "REVISE", "G6": "REVISE"}),
+])
+def test_graph_propagation_changes_everything_within_k_hops(stubs, monkeypatch, hops, change_type, expected):
+    from baselines import graph_propagation
+    from csmr.types import Memory, Observation
+    store = InMemoryAdapter([Memory(i, f"text {i}", e, a, "2026-01-01T00:00:00") for i, e, a, _ in _GRAPH])
+    vec = {f"text {i}": v for i, _, _, v in _GRAPH}
+    monkeypatch.setattr(graph_propagation.models, "embed", lambda texts: np.array([vec[t] for t in texts], float))
+    stubs["delta"] = StateChange(**{**SOLD.__dict__, "change_type": change_type})
+    monkeypatch.setattr(common, "phase_a", lambda obs, s, cfg: (stubs["delta"], None, ["G1"]))
+    t = baselines.BASELINES["graph_propagation"](Observation("x", "user", "2026-02-01T00:00:00"), store,
+                                                 {**CFG, "graph_prop_hops": hops})
+    assert _changed(t) == expected and t.candidates == {}  # no dependency/evidence model
+
+
+def test_graph_propagation_uses_phase_b_graph():
+    """The baseline and Phase B share one graph definition (hop_expansion), not two copies."""
+    from baselines import graph_propagation
+    from csmr.pipeline import candidates
+    assert graph_propagation.hop_expansion is candidates.hop_expansion
 
 
 @pytest.mark.parametrize("name", list(baselines.BASELINES))

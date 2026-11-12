@@ -337,7 +337,7 @@ CSMR is evaluated on a benchmark of memory-repair scenarios covering eight categ
 
 **Metrics:** repair precision and recall, over-invalidation (valid memories wrongly changed), under-repair (stale memories left in place), 5-way action accuracy, downstream question-answering accuracy, persistence across later turns, and cost (model calls, latency).
 
-**Baselines:** append-only (the shared agent sees dates and prefers the most recent memory, so this is also the recency baseline), last-write-wins, similarity-threshold propagation, dependency-only, evidence-only, and a single-prompt LLM that decides all actions at once.
+**Baselines:** append-only (the shared agent sees dates and prefers the most recent memory, so this is also the recency baseline), last-write-wins, similarity-threshold propagation, fixed graph propagation, dependency-only, evidence-only, and (added beyond the original plan) a single-prompt LLM that decides all actions at once. TEPA- and STALE/CUPMem-style approaches are not reimplemented: no implementation is available and their descriptions are not enough for a faithful reproduction.
 
 **Ablations:** each stage (dependency, evidence, counterfactual selection, minimality) switched off in turn, plus a sweep over λ_c showing the repair-recall vs. over-invalidation trade-off.
 

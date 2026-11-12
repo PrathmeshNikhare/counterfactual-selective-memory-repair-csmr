@@ -113,6 +113,7 @@ ablation:
 
 # Baselines
 sim_prop_threshold: 0.4
+graph_prop_hops: 1         # graph_propagation: change everything within this many hops of the root (--set graph_prop_hops=2)
 oneshot_max_tokens: 4096   # llm_oneshot: one action per memory for 30-40 memories, reasoning model
 
 # Evaluation (SPEC §14)
