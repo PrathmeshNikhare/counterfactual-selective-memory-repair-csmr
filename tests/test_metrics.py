@@ -45,7 +45,7 @@ def _stub_agent(monkeypatch):
     """Agent sees only the 5 newest memories; judge = gold answer appears verbatim. Returns the views it was given."""
     views = []
     monkeypatch.setattr(M, "answer", lambda q, mems, **k: views.append(mems) or " | ".join(m.text for m in mems[-5:]))
-    monkeypatch.setattr(M, "qa_judge", lambda q, gold, ans, cfg: gold in ans)
+    monkeypatch.setattr(M, "qa_judge", lambda q, gold, ans, cfg, pending=False: gold in ans)
     return views
 
 
@@ -131,6 +131,26 @@ def test_methods_without_trace_or_store_skip_those_metrics(monkeypatch):
     rec.trace = rec.store = None
     assert set(M.scenario_metrics(rec, CFG)) == set(M.repair(rec))
     assert len(M.scenario_metrics(_record(), CFG)) == 14  # 5 repair, 3 dependent, 1 candidate, 1 qa, 2 persist., 2 cost
+
+
+def test_qa_judge_pending_rule_only_for_pending_questions(monkeypatch):
+    seen = []
+    monkeypatch.setattr(llm, "try_json", lambda p, **k: seen.append(p) or {"correct": True})
+    cfg = {"llm": {"judge_model": None}, "judge_max_tokens": 8}
+    M.qa_judge("Where?", "Pune", "In Pune.", cfg)
+    M.qa_judge("Where?", "Pune", "In Pune, though they may move.", cfg, pending=True)
+    assert M.QA_JUDGE_PENDING not in seen[0] and '"unknown" is incorrect.\nReturn JSON only' in seen[0]  # unchanged
+    assert M.QA_JUDGE_PENDING in seen[1]
+
+
+def test_qa_passes_pending_flag_to_judge(monkeypatch):
+    got = []
+    monkeypatch.setattr(M, "answer", lambda q, mems, **k: "a")
+    monkeypatch.setattr(M, "qa_judge", lambda q, gold, ans, cfg, pending=False: got.append((q, pending)) or True)
+    rec = _record()
+    rec.scenario.gold.eval_questions[1]["pending"] = True
+    M.qa(rec, CFG)
+    assert got == [("q1", False), ("q2", True), ("q3", False)]
 
 
 def test_qa_judge_has_its_own_prompt_retries_once_then_fails_closed(monkeypatch):

@@ -2,7 +2,7 @@
   "id": "showcase_rumoured_transfer",
   "category": "weak_evidence",
   "domain": "workplace_assistant",
-  "note": "Workplace assistant. The user relays an unconfirmed, second-hand hint about a team move. Nothing may be revised or revoked; at most the office location is flagged for verification. Shows the evidence constraint protecting memory from rumours.",
+  "note": "Workplace assistant. The user relays an unconfirmed, second-hand hint about a team move. Nothing may be revised or revoked; the office (M1) and what a confirmed move would change (shuttle from HSR Layout, the HSR lease, the Bengaluru cricket league) are flagged for verification. Shows the evidence constraint protecting memory from rumours.",
   "memories": [
     {"id": "M1", "text": "The user works at Thoughtline's Bengaluru office on the payments platform team.", "entity": "user", "attribute": "work_location", "time": "2025-07-01T10:00:00", "source": "user"},
     {"id": "M2", "text": "The user commutes to the office by the company shuttle from HSR Layout.", "entity": "user", "attribute": "commute", "time": "2025-07-08T09:00:00", "source": "user"},
@@ -23,15 +23,15 @@
   "observation": {"text": "My manager hinted that our whole team might be moved to the Hyderabad office next quarter, but nothing is confirmed yet.", "source": "user", "time": "2026-10-23T19:15:00"},
   "gold": {
     "actions": {
-      "M1": "VERIFY", "M2": "KEEP", "M3": "KEEP", "M4": "KEEP", "M5": "KEEP", "M6": "KEEP",
+      "M1": "VERIFY", "M2": "VERIFY", "M3": "VERIFY", "M4": "VERIFY", "M5": "KEEP", "M6": "KEEP",
       "M7": "KEEP", "M8": "KEEP", "M9": "KEEP", "M10": "KEEP", "M11": "KEEP", "M12": "KEEP",
       "M13": "KEEP", "M14": "KEEP", "M15": "KEEP"
     },
-    "dependencies": [["M1", "M2"], ["M1", "M7"]],
+    "dependencies": [["M1", "M2"], ["M1", "M3"], ["M1", "M4"]],
     "eval_questions": [
-      {"q": "Which office does the user work at?", "gold_answer": "Thoughtline's Bengaluru office (a possible move to Hyderabad is unconfirmed).", "depends_on": ["M1"]},
-      {"q": "How does the user commute to work?", "gold_answer": "By the company shuttle from HSR Layout.", "depends_on": ["M2"]},
-      {"q": "Where does the user live?", "gold_answer": "In a leased flat in HSR Layout, Bengaluru.", "depends_on": ["M3"]},
+      {"q": "Which office does the user work at?", "gold_answer": "Thoughtline's Bengaluru office.", "depends_on": ["M1"], "pending": true},
+      {"q": "How does the user commute to work?", "gold_answer": "By the company shuttle from HSR Layout.", "depends_on": ["M2"], "pending": true},
+      {"q": "Where does the user live?", "gold_answer": "In a leased flat in HSR Layout, Bengaluru.", "depends_on": ["M3"], "pending": true},
       {"q": "Who is the user's manager?", "gold_answer": "Kavya Nair.", "depends_on": ["M5"]}
     ]
   }

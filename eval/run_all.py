@@ -57,9 +57,9 @@ def model_digests() -> dict[str, str | None]:
 def config_hash(cfg: dict, overlay: str | None = None) -> str:
     """Effective config plus the fitted weights the pipeline loads (model_digests: fitted vs hand-set and which fit)
     plus the --config-overlay's content, so runs with different overlays never merge (even when the overlay only
-    repeats config.yaml values). The `fit` block (tuning grids) is left out: it changes no run, and editing it must
-    not invalidate val traces."""
-    cfg = {k: v for k, v in cfg.items() if k != "fit"}
+    repeats config.yaml values). The `fit` block (tuning grids) and the `dataset` block (validator limits) are left
+    out: they change no run, and editing them must not invalidate val traces."""
+    cfg = {k: v for k, v in cfg.items() if k not in ("fit", "dataset")}
     h = hashlib.sha256(json.dumps(cfg, sort_keys=True, default=str).encode())
     if overlay:  # parsed content, so editing the overlay's comments does not change the hash
         h.update(b"overlay:" + json.dumps(load_overlay(overlay), sort_keys=True, default=str).encode())

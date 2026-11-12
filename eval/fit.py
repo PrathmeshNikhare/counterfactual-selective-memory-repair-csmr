@@ -14,8 +14,8 @@ Training rows (labels from gold):
   (P_dep = 1 by construction) are left out, as in the dependency metric (Spec 14), and so are gold roots that Phase A
   missed (they are the memories most affected, not "independent"). Features are the trace's: for a candidate with
   several roots, those of the root with the highest P_dep under the weights active at extraction.
-- evidence: every candidate the change affects: gold action not KEEP, or a gold dependent (a dependent kept because
-  the evidence is weak, e.g. "maybe"); y = gold is REVISE or REVOKE, i.e. the evidence was enough to modify it
+- evidence: every candidate the change affects: gold action not KEEP, or a gold dependent (older data labelled weak-
+  evidence dependents KEEP; DATASET_NOTE now makes them VERIFY); y = gold is REVISE or REVOKE, i.e. the evidence was enough to modify it
   (VERIFY = not enough). Other gold-KEEP candidates are unaffected whatever the evidence, and gold CONDITIONAL is
   decided by the temporary flag, not evidence strength: both carry no evidence label and are left out.
 --config-overlay PATH (all steps): yaml loaded on top of config.yaml and included in the config hash. tune rebuilds
