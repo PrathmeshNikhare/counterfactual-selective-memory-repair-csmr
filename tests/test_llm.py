@@ -25,7 +25,10 @@ def test_cache_hit_after_miss(fake):
     replies.append("hello")
     assert llm.call("hi") == llm.call("hi") == "hello"
     assert len(seen) == 1
-    assert llm.stats() == {"calls": 2, "hits": 1, "misses": 1, "fallbacks": {}}
+    assert llm.stats() == {"calls": 2, "hits": 1, "misses": 1, "prior_hits": 0, "fallbacks": {}}
+    llm.reset_stats()  # a new run: the same prompt is now served from an earlier run's cache entry
+    assert llm.call("hi") == "hello"
+    assert llm.stats() == {"calls": 1, "hits": 1, "misses": 0, "prior_hits": 1, "fallbacks": {}}
 
 
 def test_bad_json_retried_once(fake):

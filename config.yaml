@@ -112,3 +112,11 @@ ablation:
 
 # Baselines
 sim_prop_threshold: 0.4
+
+# Evaluation (SPEC §14)
+bootstrap_samples: 2000   # scenario-level resamples for the confidence intervals (rng = seed)
+ci_level: 0.95
+persistence_distractors:  # fallback later-turn memories, used only when a scenario has no gold.persistence_memories
+  - "The user found a coin from 1987 on the pavement."
+  - "The user heard that it rained heavily in a town they have never visited."
+  - "The user thinks crossword puzzles were harder a decade ago."

@@ -21,7 +21,7 @@ def call(prompt: str, *, system: str | None = None, json_mode: bool = False,
 - OpenAI-compatible client; `LLM_API_KEY`, `LLM_BASE_URL` from `.env`; model from config.
 - temperature 0. Disk cache (`diskcache`) keyed by sha256(model + system + prompt + json_mode).
 - `json_mode=True`: parse JSON; on failure retry once with "Return valid JSON only."; then raise.
-- Count calls (cache hits vs misses) in a module-level counter → `stats()`; used for EvidenceCost and latency metrics.
+- Count calls (cache hits vs misses) in a module-level counter → `stats()`; used for EvidenceCost and latency metrics. `prior_hits` = hits on replies cached before the last `reset_stats()` (an earlier run); 0 means the run was uncached (§14 wall time).
 - Exponential backoff on rate-limit errors.
 
 ### 1.3 `csmr/models.py`
@@ -34,7 +34,7 @@ Lazy singletons:
 `csmr/adapters/memory.py`: `InMemoryAdapter(memories: list[Memory])`, `from_json(path)`, `to_json(path)`, `snapshot() -> InMemoryAdapter` (deep copy). `update()` MUST push previous version to `history` and bump `version`.
 
 ### 1.5 Scenario loader (`csmr/scenario.py`)
-`load_scenario(path) -> Scenario` with `memories: list[Memory]`, `observation: Observation`, and a separate `gold: GoldLabels | None`. **Pipeline functions never receive `gold`.**
+`load_scenario(path) -> Scenario` with `memories: list[Memory]`, `observation: Observation`, and a separate `gold: GoldLabels | None` (`actions`, `dependencies`, `eval_questions`, optional `persistence_memories: list[Memory]`). **Pipeline functions never receive `gold`.**
 
 ---
 
@@ -253,14 +253,43 @@ Each: `def run(obs, store, cfg) -> dict[str, Action]` + revised texts. Same agen
 ## 14. Evaluation (`eval/`) — Paper VIII
 
 `metrics.py` (reads gold — the ONLY place besides fit code):
-- dependency P/R/F1 (pairs with P ≥ τd vs gold_dependencies)
-- candidate recall (gold non-KEEP memories ∈ C)
-- repair precision = |changed ∩ gold-changed| / |changed|; repair recall = |changed ∩ gold-changed| / |gold-changed| (changed = REVISE/REVOKE; also report an action-level accuracy over 5 classes)
-- over-invalidation = gold KEEP memories that were REVISE/REVOKE’d / gold KEEP count
-- under-repair = gold REVISE/REVOKE memories left KEEP / gold-changed count
-- downstream QA accuracy: agent answers `eval_questions` on committed store; LLM judge vs gold answer (different prompt from the selection judge)
-- persistence: append 3 distractor memories, re-ask eval questions
-- LLM calls, wall time per scenario
+
+```python
+@dataclass
+class Record: scenario: Scenario; final_actions: dict[str, str]; trace: Trace | None = None; store: MemoryStoreAdapter | None = None
+def repair(rec) / dependency(rec, cfg) / candidate_recall(rec) / qa(rec, cfg) / persistence(rec, cfg) / cost(rec) -> dict[str, tuple[num, den]]
+def scenario_metrics(rec, cfg) -> dict[str, tuple[num, den]]      # all of the above for one record
+def aggregate(rows, cfg) -> dict[str, {"value", "lo", "hi", "n"}]
+```
+- One `Record` per (method, scenario). `final_actions`: memory id → action; ids left out are KEEP. `trace` is None for a method with no CSMR trace (trace metrics are then skipped). `store` is the committed store; without it QA accuracy and persistence are skipped.
+- Every metric is a per-scenario count pair `(numerator, denominator)`. Its value over a set of scenarios is **pooled**: Σ numerators / Σ denominators (over memories / questions, not a mean of per-scenario ratios). A metric with Σ denominators = 0 is NaN.
+- Gold labels are strict: every memory needs a `gold.actions` label and it must be exactly one of the five actions (`"REVOKE/REVISE"` raises).
+
+Definitions (gold = `gold.actions`; pred = `final_actions`; changed = pred ∈ {REVISE, REVOKE}; gold-changed = gold ∈ {REVISE, REVOKE}; C = `trace.candidates`):
+
+| metric | numerator | denominator |
+|---|---|---|
+| `repair_precision` | \|changed ∩ gold-changed\| | \|changed\| |
+| `repair_recall` | \|changed ∩ gold-changed\| | \|gold-changed\| |
+| `over_invalidation` | gold KEEP memories that were changed | gold KEEP memories |
+| `under_repair` | gold-changed memories left KEEP | \|gold-changed\| |
+| `action_accuracy` (5-way) | memories with pred = gold | all memories |
+| `dependent_precision` | \|pred-dep ∩ gold-dep\| | \|pred-dep\| |
+| `dependent_recall` | \|pred-dep ∩ gold-dep\| | \|gold-dep\| |
+| `dependent_f1` | 2·\|pred-dep ∩ gold-dep\| | \|pred-dep\| + \|gold-dep\| |
+| `candidate_recall` | gold non-KEEP memories ∈ C | gold non-KEEP memories |
+| `qa_accuracy` | eval questions judged correct | eval questions |
+| `persistence` | eval questions judged correct with later memories in view | eval questions |
+| `persistence_fallback` | 1 if the config distractors were used | 1 |
+| `llm_calls` | `trace.llm_stats.calls` | 1 |
+| `wall_time_s` | `trace.wall_time_s` | 1 (uncached runs only) |
+
+- Repair: REVISE where gold says REVOKE (or the reverse) counts as a correct change for precision/recall but as wrong for `action_accuracy`. `under_repair` is not 1 − recall: a gold-changed memory given VERIFY/CONDITIONAL is neither repaired nor left KEEP.
+- **Dependent-level dependency P/R/F1**: the classifier scores each non-root candidate against the roots and the trace keeps the max, so pairs cannot be recovered; a gold `(root, dependent)` pair is matched on its dependent. pred-dep = non-root candidates with P_dep ≥ τd; gold-dep = second elements of `gold.dependencies` (chains included); pipeline roots (P_dep = 1 by construction) are removed from both.
+- Downstream QA accuracy: the shared agent (§9) answers each `eval_questions[].q` on the committed store, rendered as in §8 (revoked excluded, `[unverified]` / condition tags). `qa_judge` grades the answer against `gold_answer` with `QA_JUDGE_PROMPT` → `{"correct": bool}`; this prompt is separate from the selection judge (§10) and never sees Δ. A malformed reply is retried once with a changed prompt; if still malformed the answer counts as incorrect and a `qa_judge` fallback is recorded.
+- Persistence: the eval questions are re-asked with later-turn memories appended to the agent's view (never to the store). They are the scenario's `gold.persistence_memories` (see DATASET_NOTE; each must be dated after the observation, else ValueError). A scenario without the field falls back to the fixed off-topic `cfg.persistence_distractors`, dated after the observation; `persistence_fallback` reports the share of scenarios that did.
+- Cost: `llm_calls` counts every pipeline call, cache hits included, so a cached rerun reports the same number. `wall_time_s` is taken only from uncached runs: traces with `llm_stats.prior_hits == 0` (no reply served from an earlier run's cache; hits on replies cached earlier in the same run are normal). Traces without that counter are excluded.
+- Confidence intervals (`aggregate`): scenario-level percentile bootstrap. Whole scenarios are resampled with replacement `cfg.bootstrap_samples` times (rng seeded with `cfg.seed`, the same resamples for every metric), the pooled ratio is recomputed on each resample, and `lo`/`hi` are the percentiles for `cfg.ci_level` (0.95 → 2.5 / 97.5). Resamples where the ratio is undefined are dropped. `n` = scenarios where the metric is defined.
 
 `run_all.py --split test --methods all` → `results/main.csv`, `results/per_category.csv`.
 `ablations.py` → `results/ablations.csv`. `plots.py` → λc sweep plot (repair recall vs over-invalidation).

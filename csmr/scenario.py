@@ -14,6 +14,7 @@ class GoldLabels:
     actions: dict[str, str]
     dependencies: list[tuple[str, str]]
     eval_questions: list[dict]
+    persistence_memories: list[Memory] = field(default_factory=list)  # later-turn memories for eval (Spec 14)
 
 
 @dataclass
@@ -28,6 +29,7 @@ class Scenario:
 def load_scenario(path: str | Path) -> Scenario:
     d = json.loads(Path(path).read_text(encoding="utf-8"))
     g = d.get("gold")
-    gold = GoldLabels(g["actions"], [tuple(p) for p in g["dependencies"]], g["eval_questions"]) if g else None
+    gold = GoldLabels(g["actions"], [tuple(p) for p in g["dependencies"]], g["eval_questions"],
+                      [Memory(**m) for m in g.get("persistence_memories", [])]) if g else None
     return Scenario(d["id"], [Memory(**m) for m in d["memories"]], Observation(**d["observation"]), gold,
                     {k: d[k] for k in ("category", "domain", "note") if k in d})

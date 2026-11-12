@@ -13,6 +13,14 @@ Schema rules:
   - `actions`: {memory_id: KEEP|VERIFY|CONDITIONAL|REVISE|REVOKE} for every memory
   - `dependencies`: [[root_id, dependent_id], …]
   - `eval_questions`: [{q, gold_answer, depends_on: [ids]}]
+  - `persistence_memories`: 3–5 later-turn memories written by the generator, same fields as `memories[]`
+    (ids `P1`, `P2`, …). Used only by the persistence metric (SPEC §14): they are appended to the agent's view
+    before the eval questions are re-asked. Rules:
+    - on-topic: same domain as the scenario (not unrelated filler);
+    - must NOT restate, confirm or contradict the state change, and must not change any `gold_answer`;
+    - `time` strictly after `observation.time` (the metric raises otherwise).
+    If the field is missing, the metric falls back to the fixed off-topic `persistence_distractors` in
+    `config.yaml` and reports it (`persistence_fallback`).
 
 ## Labeling conventions
 

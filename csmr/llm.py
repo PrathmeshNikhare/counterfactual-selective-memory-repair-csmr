@@ -13,7 +13,8 @@ from dotenv import load_dotenv
 
 from csmr.config import ROOT, load_config
 
-_stats = {"calls": 0, "hits": 0, "misses": 0}
+_stats = {"calls": 0, "hits": 0, "misses": 0, "prior_hits": 0}
+_run_keys: set[str] = set()  # keys computed since reset_stats(); a hit on any other key (prior_hits) is an earlier run's
 _fallbacks: dict[str, int] = {}  # malformed-LLM-output fallbacks by kind, reported in the trace
 log = logging.getLogger(__name__)
 _cache: diskcache.Cache | None = None
@@ -29,6 +30,7 @@ def stats() -> dict:
 def reset_stats() -> None:
     for k in _stats:
         _stats[k] = 0
+    _run_keys.clear()
     _fallbacks.clear()
 
 
@@ -111,8 +113,10 @@ def call(prompt: str, *, system: str | None = None, json_mode: bool = False, mod
     _stats["calls"] += 1
     if key in cache:
         _stats["hits"] += 1
+        _stats["prior_hits"] += key not in _run_keys
         return cache[key]
     _stats["misses"] += 1
+    _run_keys.add(key)
     if json_mode:
         try:
             out = _complete_json(model, system, prompt, max_tokens, cfg)

@@ -40,7 +40,7 @@ Integration fixture for everything: `data/dev/car_sale.json`.
 
 ## Phase 2 — after dataset exists (see docs/DATASET_NOTE.md)
 - [ ] **E1 `baselines/`** — 7 baselines per SPEC §13.
-- [ ] **E2 `eval/metrics.py`** — all metrics per SPEC §14.
+- [x] **E2 `eval/metrics.py`** — all metrics per SPEC §14.
 - [ ] **E3** `fit_dependency` / `fit_evidence` on train split; tune τd, τe, λ on val.
 - [ ] **E4 `eval/run_all.py`** → results/main.csv, per_category.csv.
 - [ ] **E5 `eval/ablations.py`**, `eval/plots.py` (λc sweep).
